@@ -59,7 +59,7 @@ impl Registers {
 }
 
 const fn calc_nth_bit_power(bit: u32) -> u16 {
-    2u16.pow(bit - 1)
+    2u16.pow(bit)
 }
 
 #[inline]
@@ -105,9 +105,9 @@ mod tests {
 
     #[test]
     fn flags() {
-        // 00000000_01000000 = 64
+        // 00000000_10000000 = 128
         let r = Registers {
-            af: 64,
+            af: 128,
             ..Default::default()
         };
 
@@ -117,7 +117,7 @@ mod tests {
         assert_eq!(r.c_flg(), false);
 
         let r = Registers {
-            af: 91, // 01011011
+            af: 176, // 10110000
             ..Default::default()
         };
 
