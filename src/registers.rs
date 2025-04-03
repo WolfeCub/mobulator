@@ -67,8 +67,31 @@ impl Registers {
             R16::SP => self.sp = val,
         }
     }
+
+    pub fn get_r16(&mut self, r16: R16) -> u16 {
+        match r16 {
+            R16::BC => self.bc,
+            R16::DE => self.de,
+            R16::HL => self.hl,
+            R16::SP => self.sp,
+        }
+    }
 }
 
+// ┌───────┬────┬────┬────┬────┬────┬────┬──────┬────┐
+// │       │  0 │  1 │  2 │  3 │  4 │  5 │  6   │  7 │
+// ├───────┼────┼────┼────┼────┼────┼────┼──────┼────┤
+// │ r8    │ b  │ c  │ d  │ e  │ h  │ l  │ [hl] │ a  │
+// │ r16   │ bc │ de │ hl │ sp │    │    │      │    │
+// │ r16stk│ bc │ de │ hl │ af │    │    │      │    │
+// │ r16mem│ bc │ de │ hl+│ hl-│    │    │      │    │
+// │ cond  │ nz │ z  │ nc │ c  │    │    │      │    │
+// ├───────┴────┴────┴────┴────┴────┴────┴──────┴────┤
+// │ b3    │ A 3-bit bit index                       │
+// │ tgt3  │ rst's target address, divided by 8      │
+// │ imm8  │ The following byte                      │
+// │ imm16 │ The following two bytes (little-endian) │
+// └─────────────────────────────────────────────────┘
 // TODO: Remove repr
 #[repr(u8)]
 pub enum R8 {
@@ -78,15 +101,15 @@ pub enum R8 {
     E = 3,
     H = 4,
     L = 5,
-    HL = 6, // TODO: What is this
+    HL = 6, // TODO: What is this '[hl]'
     A = 7,
 }
 
 pub enum R16 {
-    BC = 0,
-    DE = 1,
-    HL = 2,
-    SP = 3,
+    BC,
+    DE,
+    HL,
+    SP,
 }
 
 impl TryFrom<u8> for R16 {

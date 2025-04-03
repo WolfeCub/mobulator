@@ -5,33 +5,25 @@ use crate::{
     utils::{is_bit_set_u8, join_u8s},
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Cpu {
     registers: Registers,
+    instructions: Vec<u8>,
+    memory: [u8; 0xFFFF],
 }
 
 impl Cpu {
-    pub fn process_instructions(&mut self, instructions: &[u8]) -> anyhow::Result<()> {
-        let mut iter = instructions.into_iter();
+    pub fn new() -> Self {
+        Self {
+            registers: Registers::default(),
+            instructions: Vec::new(),
+            memory: [0; 0xFFFF],
+        }
+    }
 
-        // ┌───────┬────┬────┬────┬────┬────┬────┬──────┬────┐
-        // │       │  0 │  1 │  2 │  3 │  4 │  5 │  6   │  7 │
-        // ├───────┼────┼────┼────┼────┼────┼────┼──────┼────┤
-        // │ r8    │ b  │ c  │ d  │ e  │ h  │ l  │ [hl] │ a  │
-        // │ r16   │ bc │ de │ hl │ sp │    │    │      │    │
-        // │ r16stk│ bc │ de │ hl │ af │    │    │      │    │
-        // │ r16mem│ bc │ de │ hl+│ hl-│    │    │      │    │
-        // │ cond  │ nz │ z  │ nc │ c  │    │    │      │    │
-        // ├───────┴────┴────┴────┴────┴────┴────┴──────┴────┤
-        // │ b3    │ A 3-bit bit index                       │
-        // │ tgt3  │ rst's target address, divided by 8      │
-        // │ imm8  │ The following byte                      │
-        // │ imm16 │ The following two bytes (little-endian) │
-        // └─────────────────────────────────────────────────┘
-
-        // TODO: Don't want this to be a &u8 just a u8
-        while let Some(instruction) = iter.next() {
-            let segments = InstructionSegments::from_instruction(*instruction);
+    pub fn process_instructions(&mut self) -> anyhow::Result<()> {
+        while let Some(instruction) = self.next() {
+            let segments = InstructionSegments::from_instruction(instruction);
 
             match segments {
                 // NOOP
@@ -47,22 +39,44 @@ impl Cpu {
                     p,
                     ..
                 } => {
-                    let first_byte = iter
+                    let first_byte = self
                         .next()
                         .context("Unable to read next byte after imm16")?;
-                    let second_byte = iter
+                    let second_byte = self
                         .next()
                         .context("Unable to read next byte after imm16")?;
 
-                    let joint = join_u8s(*first_byte, *second_byte);
+                    let joint = join_u8s(second_byte, first_byte);
                     self.registers.set_r16(p.try_into()?, joint);
-                }
+                },
 
-                _ => todo!("Haven't implented instruction: {:08b}, segments: {:?}", *instruction, segments),
+                // ld [r16mem], a
+                InstructionSegments {
+                    x: 0,
+                    q: false,
+                    z: 2,
+                    p,
+                    ..
+                } => {
+
+                },
+
+                _ => todo!("Haven't implented instruction: {:08b}, segments: {:?}", instruction, segments),
             };
         }
 
         Ok(())
+    }
+}
+
+impl Iterator for Cpu {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let memory_offset = 0;
+        let index = (self.registers.pc - memory_offset) / 8;
+        self.registers.pc += 8;
+        self.instructions.get(index as usize).copied()
     }
 }
 
@@ -138,12 +152,14 @@ mod tests {
             let instruction = u8::from_str_radix(&format!("00{:02b}0001", i), 2)
                 .expect("Unable to parse generated number");
 
-            let mut cpu = Cpu::default();
-            cpu.process_instructions(&[
+            let mut cpu = Cpu::new();
+            cpu.instructions = vec![
                 instruction,
-                0b10111100, // first byte
-                0b00111100, // second byte
-            ]).expect("Unable to process CPU instructions");
+                // Swapped order. Little endian
+                0b00111100,
+                0b10111100,
+            ];
+            cpu.process_instructions().expect("Unable to process CPU instructions");
 
             let target = match R16::try_from(i).expect("Used invalid R16 register") {
                 R16::BC => cpu.registers.bc,
