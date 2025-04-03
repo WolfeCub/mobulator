@@ -1,3 +1,5 @@
+use crate::utils::{high_u8, is_bit_set_u16};
+
 // https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
 #[derive(Debug, Clone, Default)]
 pub struct Registers {
@@ -18,19 +20,19 @@ impl Registers {
     }
 
     pub fn z_flg(&self) -> bool {
-        is_bit_set(self.af, 7)
+        is_bit_set_u16(self.af, 7)
     }
 
     pub fn n_flg(&self) -> bool {
-        is_bit_set(self.af, 6)
+        is_bit_set_u16(self.af, 6)
     }
 
     pub fn h_flg(&self) -> bool {
-        is_bit_set(self.af, 5)
+        is_bit_set_u16(self.af, 5)
     }
 
     pub fn c_flg(&self) -> bool {
-        is_bit_set(self.af, 4)
+        is_bit_set_u16(self.af, 4)
     }
 
     pub fn b(&self) -> u8 {
@@ -56,58 +58,111 @@ impl Registers {
     pub fn l(&self) -> u8 {
         self.hl as u8
     }
+
+    pub fn set_r16(&mut self, r16: R16, val: u16) {
+        match r16 {
+            R16::BC => self.bc = val,
+            R16::DE => self.de = val,
+            R16::HL => self.hl = val,
+            R16::SP => self.sp = val,
+        }
+    }
 }
 
-const fn calc_nth_bit_power(bit: u32) -> u16 {
-    2u16.pow(bit)
+// TODO: Remove repr
+#[repr(u8)]
+pub enum R8 {
+    B = 0,
+    C = 1,
+    D = 2,
+    E = 3,
+    H = 4,
+    L = 5,
+    HL = 6, // TODO: What is this
+    A = 7,
 }
 
-#[inline]
-fn is_bit_set(number: u16, bit: u32) -> bool {
-    (number & calc_nth_bit_power(bit)) != 0
+pub enum R16 {
+    BC = 0,
+    DE = 1,
+    HL = 2,
+    SP = 3,
 }
 
-#[inline]
-fn high_u8(number: u16) -> u8 {
-    (number >> 8) as u8
+impl TryFrom<u8> for R16 {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(R16::BC),
+            1 => Ok(R16::DE),
+            2 => Ok(R16::HL),
+            3 => Ok(R16::SP),
+            _ => anyhow::bail!("Unable to convert u16: '{value}' to R16"),
+        }
+    }
 }
 
+// TODO: Remove repr
+#[repr(u8)]
+pub enum R16Stk {
+    BC = 0,
+    DE = 1,
+    HL = 2,
+    AF = 3,
+}
 
-// TODO: Test more thouroughly
+// TODO: Remove repr
+#[repr(u8)]
+pub enum R16Mem {
+    BC = 0,
+    DE = 1,
+    HLI = 2,
+    HLD = 3,
+}
+
+// TODO: Remove repr
+#[repr(u8)]
+pub enum Cond {
+    NZ = 0,
+    Z = 1,
+    NC = 2,
+    C = 3,
+}
+
+// TODO: Test more thoroughly
 #[cfg(test)]
 mod tests {
     use super::Registers;
 
     #[test]
     fn b_registers() {
-        // 00000101_00001010 = 1290
-        //        5|      10
-        //
+        // 00000101_00001010
         let r = Registers {
-            af: 1290,
-            bc: 1290,
-            de: 1290,
-            hl: 1290,
+            af: 0b00000101_00001010,
+            bc: 0b00000101_00001010,
+            de: 0b00000101_00001010,
+            hl: 0b00000101_00001010,
             ..Default::default()
         };
 
-        assert_eq!(r.a(), 5);
+        assert_eq!(r.a(), 0b00000101);
 
-        assert_eq!(r.b(), 5);
-        assert_eq!(r.c(), 10);
+        assert_eq!(r.b(), 0b00000101);
+        assert_eq!(r.c(), 0b00001010);
 
-        assert_eq!(r.d(), 5);
-        assert_eq!(r.e(), 10);
+        assert_eq!(r.d(), 0b00000101);
+        assert_eq!(r.e(), 0b00001010);
 
-        assert_eq!(r.h(), 5);
-        assert_eq!(r.l(), 10);
+        assert_eq!(r.h(), 0b00000101);
+        assert_eq!(r.l(), 0b00001010);
     }
 
     #[test]
     fn flags() {
-        // 00000000_10000000 = 128
+        // 00000000_10000000
         let r = Registers {
-            af: 128,
+            af: 0b00000000_10000000,
             ..Default::default()
         };
 
