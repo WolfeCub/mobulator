@@ -1,4 +1,4 @@
-use crate::utils::{high_u8, is_bit_set_u16};
+use crate::utils::{high_u8, is_bit_set_u16, set_high_u8};
 
 // https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
 #[derive(Debug, Clone, Default)]
@@ -19,8 +19,8 @@ impl Registers {
         high_u8(self.af)
     }
 
-    pub fn set_a(&mut self) {
-
+    pub fn set_a(&mut self, val: u8) {
+        set_high_u8(&mut self.af, val);
     }
 
     pub fn z_flg(&self) -> bool {

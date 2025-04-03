@@ -1,9 +1,6 @@
 use anyhow::Context;
 
-use crate::{
-    registers::Registers,
-    utils::is_bit_set_u8,
-};
+use crate::{registers::Registers, utils::is_bit_set_u8};
 
 #[derive(Debug, Clone)]
 pub struct Cpu {
@@ -64,12 +61,7 @@ impl Cpu {
                     ..
                 } => {
                     let addr = self.registers.get_r16(p.try_into()?);
-
-                    let Some(value) = self.memory.get_byte(addr) else {
-                        anyhow::bail!("Attempted to access out of bounds memory address: {:x}", addr);
-                    };
-
-                    // self.registers.a
+                    self.memory.set_byte(addr, self.registers.a());
                 }
 
                 _ => todo!(
@@ -88,10 +80,9 @@ impl Iterator for Cpu {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let memory_offset = 0;
-        let index = (self.registers.pc - memory_offset) / 8;
+        let byte = self.memory.get_byte(self.registers.pc);
         self.registers.pc += 8;
-        self.memory.get_byte(index)
+        byte
     }
 }
 
@@ -120,8 +111,12 @@ impl Memory {
         }
     }
 
-    pub fn get_byte(&self, index: u16) -> Option<u8> {
-        self.memory.get(usize::from(index)).copied()
+    pub fn get_byte(&self, addr: u16) -> Option<u8> {
+        self.memory.get(usize::from(addr / 8)).copied()
+    }
+
+    pub fn set_byte(&mut self, addr: u16, value: u8) {
+        self.memory[usize::from(addr / 8)] = value;
     }
 }
 
@@ -203,8 +198,7 @@ mod tests {
                 // Swapped order. Little endian
                 0b00111100,
                 0b10111100,
-                // Halt
-                0b01110110,
+                0b01110110, // Halt
             ]);
             cpu.process_instructions()
                 .expect("Unable to process CPU instructions");
@@ -216,6 +210,30 @@ mod tests {
                 R16::SP => cpu.registers.sp,
             };
             assert_eq!(target, 0b10111100_00111100);
+        }
+    }
+
+    #[test]
+    fn ld_r16mem_a() {
+        // ld [r16mem], a
+        for i in 0..4 {
+            let instruction = u8::from_str_radix(&format!("00{:02b}0010", i), 2)
+                .expect("Unable to parse generated number");
+            println!("{:b}", instruction);
+
+            let mut cpu = Cpu::new();
+            cpu.memory.memory[..2].copy_from_slice(&[
+                instruction,
+                0b01110110, // Halt
+            ]);
+            cpu.registers.set_a(0b10110101);
+            let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
+            cpu.registers.set_r16(i.try_into().unwrap(), addr);
+            cpu.process_instructions()
+                .expect("Unable to process CPU instructions");
+
+            let mem_val = cpu.memory.memory[usize::from(addr/8)];
+            assert_eq!(mem_val, 0b10110101);
         }
     }
 }
