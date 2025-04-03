@@ -19,3 +19,25 @@ pub(crate) const fn high_u8(number: u16) -> u8 {
     let [high, _] = number.to_be_bytes();
     high
 }
+
+pub(crate) const fn set_high_u8(number: &mut u16, val: u8) {
+    *number &= 0b00000000_11111111;
+    *number |= (val as u16) << 8;
+}
+
+#[cfg(test)]
+mod test {
+    use super::set_high_u8;
+
+    #[test]
+    fn test_set_high() {
+        let mut target = 0b10110001_10001110;
+        let new_val = 0b11101010;
+
+        set_high_u8(&mut target, new_val);
+        let [high, low] = target.to_be_bytes();
+
+        assert_eq!(high, new_val);
+        assert_eq!(low, 0b10001110);
+    }
+}
