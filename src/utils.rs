@@ -16,25 +16,6 @@ pub(crate) const fn is_bit_set_u16(number: u16, bit: u32) -> bool {
 }
 
 pub(crate) const fn high_u8(number: u16) -> u8 {
-    (number >> 8) as u8
-}
-
-pub(crate) const fn join_u8s(one: u8, two: u8) -> u16 {
-    (one as u16) << 8 | two as u16
-}
-
-
-// TODO: Expand these
-#[cfg(test)]
-mod tests {
-    use crate::utils::join_u8s;
-
-    #[test]
-    fn test_join_u8s() {
-        // 00100011_11001110
-        assert_eq!(join_u8s(0b00100011, 0b11001110), 0b00100011_11001110);
-
-        // 01100011_11100100
-        assert_eq!(join_u8s(0b01100011, 0b11100100), 0b01100011_11100100);
-    }
+    let [high, _] = number.to_be_bytes();
+    high
 }

@@ -2,22 +2,20 @@ use anyhow::Context;
 
 use crate::{
     registers::Registers,
-    utils::{is_bit_set_u8, join_u8s},
+    utils::is_bit_set_u8,
 };
 
 #[derive(Debug, Clone)]
 pub struct Cpu {
     registers: Registers,
-    instructions: Vec<u8>,
-    memory: [u8; 0xFFFF],
+    memory: Memory,
 }
 
 impl Cpu {
     pub fn new() -> Self {
         Self {
             registers: Registers::default(),
-            instructions: Vec::new(),
-            memory: [0; 0xFFFF],
+            memory: Memory::new(),
         }
     }
 
@@ -30,6 +28,13 @@ impl Cpu {
                 InstructionSegments {
                     x: 0, y: 0, z: 0, ..
                 } => (),
+
+                // halt
+                InstructionSegments {
+                    x: 1, y: 6, z: 6, ..
+                } => {
+                    return Ok(());
+                }
 
                 // ld r16, imm16
                 InstructionSegments {
@@ -46,9 +51,9 @@ impl Cpu {
                         .next()
                         .context("Unable to read next byte after imm16")?;
 
-                    let joint = join_u8s(second_byte, first_byte);
+                    let joint = u16::from_le_bytes([first_byte, second_byte]);
                     self.registers.set_r16(p.try_into()?, joint);
-                },
+                }
 
                 // ld [r16mem], a
                 InstructionSegments {
@@ -58,10 +63,20 @@ impl Cpu {
                     p,
                     ..
                 } => {
+                    let addr = self.registers.get_r16(p.try_into()?);
 
-                },
+                    let Some(value) = self.memory.get_byte(addr) else {
+                        anyhow::bail!("Attempted to access out of bounds memory address: {:x}", addr);
+                    };
 
-                _ => todo!("Haven't implented instruction: {:08b}, segments: {:?}", instruction, segments),
+                    // self.registers.a
+                }
+
+                _ => todo!(
+                    "Haven't implented instruction: {:08b}, segments: {:?}",
+                    instruction,
+                    segments
+                ),
             };
         }
 
@@ -76,7 +91,37 @@ impl Iterator for Cpu {
         let memory_offset = 0;
         let index = (self.registers.pc - memory_offset) / 8;
         self.registers.pc += 8;
-        self.instructions.get(index as usize).copied()
+        self.memory.get_byte(index)
+    }
+}
+
+/// 0x0000 - 0x00FF: Boot ROM
+/// 0x0000 - 0x3FFF: Game ROM Bank 0
+/// 0x4000 - 0x7FFF: Game ROM Bank N
+/// 0x8000 - 0x97FF: Tile RAM
+/// 0x9800 - 0x9FFF: Background Map
+/// 0xA000 - 0xBFFF: Cartridge RAM
+/// 0xC000 - 0xDFFF: Working RAM
+/// 0xE000 - 0xFDFF: Echo RAM
+/// 0xFE00 - 0xFE9F: OAM (Object Atribute Memory)
+/// 0xFEA0 - 0xFEFF: Unused
+/// 0xFF00 - 0xFF7F: I/O Registers
+/// 0xFF80 - 0xFFFE: High RAM Area
+/// 0xFFFF: Interrupt Enabled Register
+#[derive(Debug, Clone)]
+struct Memory {
+    memory: [u8; 0xFFFF],
+}
+
+impl Memory {
+    pub fn new() -> Self {
+        Self {
+            memory: [0; 0xFFFF],
+        }
+    }
+
+    pub fn get_byte(&self, index: u16) -> Option<u8> {
+        self.memory.get(usize::from(index)).copied()
     }
 }
 
@@ -153,13 +198,16 @@ mod tests {
                 .expect("Unable to parse generated number");
 
             let mut cpu = Cpu::new();
-            cpu.instructions = vec![
+            cpu.memory.memory[..4].copy_from_slice(&[
                 instruction,
                 // Swapped order. Little endian
                 0b00111100,
                 0b10111100,
-            ];
-            cpu.process_instructions().expect("Unable to process CPU instructions");
+                // Halt
+                0b01110110,
+            ]);
+            cpu.process_instructions()
+                .expect("Unable to process CPU instructions");
 
             let target = match R16::try_from(i).expect("Used invalid R16 register") {
                 R16::BC => cpu.registers.bc,

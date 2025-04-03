@@ -19,6 +19,10 @@ impl Registers {
         high_u8(self.af)
     }
 
+    pub fn set_a(&mut self) {
+
+    }
+
     pub fn z_flg(&self) -> bool {
         is_bit_set_u16(self.af, 7)
     }
