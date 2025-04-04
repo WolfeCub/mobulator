@@ -1,6 +1,6 @@
 use anyhow::Context;
 
-use crate::{registers::Registers, utils::is_bit_set_u8};
+use crate::{instructions::*, registers::Registers, utils::is_bit_set_u8};
 
 #[derive(Debug, Clone)]
 pub struct Cpu {
@@ -18,21 +18,19 @@ impl Cpu {
 
     pub fn process_instructions(&mut self) -> anyhow::Result<()> {
         while let Some(instruction) = self.next() {
-            let segments = InstructionSegments::from_instruction(instruction);
-
-            match segments {
-                // NOOP
-                InstructionSegments {
-                    x: 0, y: 0, z: 0, ..
-                } => (),
-
-                // halt
-                InstructionSegments {
-                    x: 1, y: 6, z: 6, ..
-                } => {
+            // Match instructions that don't have any "variables"
+            match instruction {
+                NOOP => {
+                    ()
+                }
+                HALT => {
                     return Ok(());
                 }
+                _ => {},
+            };
 
+            let segments = InstructionSegments::from_instruction(instruction);
+            match segments {
                 // ld r16, imm16
                 InstructionSegments {
                     x: 0,
