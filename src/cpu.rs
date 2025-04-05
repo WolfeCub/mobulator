@@ -142,17 +142,23 @@ impl Memory {
 #[derive(Debug, Clone, Copy)]
 pub struct Instruction(u8);
 
+// http://z80.info/decoding.htm
+// x = the opcode's 1st octal digit (i.e. bits 7-6)
+// y = the opcode's 2nd octal digit (i.e. bits 5-3)
+// z = the opcode's 3rd octal digit (i.e. bits 2-0)
+// p = y rightshifted one position (i.e. bits 5-4)
+// q = y modulo 2 (i.e. bit 3)
 impl Instruction {
     pub fn x(&self) -> u8 {
         self.0 >> 6
     }
 
     pub fn y(&self) -> u8 {
-        (self.0 & 63) >> 3
+        (self.0 & 0b00111111) >> 3
     }
 
     pub fn z(&self) -> u8 {
-        self.0 & 7
+        self.0 & 0b00000111
     }
 
     pub fn p(&self) -> u8 {
