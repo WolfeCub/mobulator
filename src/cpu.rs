@@ -139,6 +139,31 @@ impl Memory {
 ///     x         y           z
 ///           └───┘   |
 ///             p     q
+#[derive(Debug, Clone, Copy)]
+pub struct Instruction(u8);
+
+impl Instruction {
+    pub fn x(&self) -> u8 {
+        self.0 >> 6
+    }
+
+    pub fn y(&self) -> u8 {
+        (self.0 & 63) >> 3
+    }
+
+    pub fn z(&self) -> u8 {
+        self.0 & 7
+    }
+
+    pub fn p(&self) -> u8 {
+        (self.0 >> 4) & 0b00000011
+    }
+
+    pub fn q(&self) -> bool {
+        is_bit_set_u8(self.0, 3)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct InstructionSegments {
     x: u8,
@@ -147,6 +172,7 @@ pub struct InstructionSegments {
     p: u8,
     q: bool,
 }
+
 
 impl InstructionSegments {
     pub fn from_instruction(instruction: u8) -> Self {
@@ -168,7 +194,7 @@ impl InstructionSegments {
 
 #[cfg(test)]
 mod tests {
-    use crate::{cpu::InstructionSegments, registers::R16};
+    use crate::{cpu::Instruction, registers::R16};
 
     use super::Cpu;
 
@@ -178,23 +204,23 @@ mod tests {
         //  x|  y|  z
         //    110
         //    p|q
-        let segs = InstructionSegments::from_instruction(0b01_110_010);
-        assert_eq!(segs.x, 0b01);
-        assert_eq!(segs.y, 0b110);
-        assert_eq!(segs.z, 0b010);
-        assert_eq!(segs.p, 0b11);
-        assert_eq!(segs.q, false);
+        let segs = Instruction(0b01_110_010);
+        assert_eq!(segs.x(), 0b01);
+        assert_eq!(segs.y(), 0b110);
+        assert_eq!(segs.z(), 0b010);
+        assert_eq!(segs.p(), 0b11);
+        assert_eq!(segs.q(), false);
 
         // 11_101_101
         //  x|  y|  z
         //    101
         //    p|q
-        let segs = InstructionSegments::from_instruction(0b11_101_101);
-        assert_eq!(segs.x, 0b11);
-        assert_eq!(segs.y, 0b101);
-        assert_eq!(segs.z, 0b101);
-        assert_eq!(segs.p, 0b10);
-        assert_eq!(segs.q, true);
+        let segs = Instruction(0b11_101_101);
+        assert_eq!(segs.x(), 0b11);
+        assert_eq!(segs.y(), 0b101);
+        assert_eq!(segs.z(), 0b101);
+        assert_eq!(segs.p(), 0b10);
+        assert_eq!(segs.q(), true);
     }
 
     #[test]
