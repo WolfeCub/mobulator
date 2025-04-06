@@ -18,17 +18,17 @@ impl Cpu {
     }
 
     pub fn process_instructions(&mut self) -> anyhow::Result<()> {
-        while let Some(instruction) = self.next() {
-            // Match instructions that don't have any "variables"
-            dbg!(instruction);
-            match instruction {
+        while let Some(instruction_byte) = self.next() {
+            let instruction = Instruction(instruction_byte);
+            match instruction_byte {
                 NOOP => (),
+
                 HALT => {
                     return Ok(());
-                },
+                }
+
                 // ld r16, imm16
                 opcode_match!(00__0001) => {
-                    let instruction = Instruction(instruction);
                     let first_byte = self
                         .next()
                         .context("Unable to read next byte after imm16")?;
@@ -38,34 +38,17 @@ impl Cpu {
 
                     let joint = u16::from_le_bytes([first_byte, second_byte]);
                     self.registers.set_r16(instruction.p().try_into()?, joint);
-                    return Ok(());
                 }
-                _ => { }
-            };
 
-            let segments = InstructionSegments::from_instruction(instruction);
-            match segments {
                 // ld [r16mem], a
-                InstructionSegments {
-                    x: 0,
-                    q: false,
-                    z: 2,
-                    p,
-                    ..
-                } => {
-                    let addr = self.registers.get_r16(p.try_into()?);
+                opcode_match!(00__0010) => {
+                    let addr = self.registers.get_r16(instruction.p().try_into()?);
                     self.memory.set_byte(addr, self.registers.a());
                 }
 
                 // ld a, [r16mem]
-                InstructionSegments {
-                    x: 0,
-                    q: true,
-                    z: 2,
-                    p,
-                    ..
-                } => {
-                    let addr = self.registers.get_r16(p.try_into()?);
+                opcode_match!(00__1010) => {
+                    let addr = self.registers.get_r16(instruction.p().try_into()?);
 
                     let Some(data) = self.memory.get_byte(addr) else {
                         anyhow::bail!("Out of bounds memory access at {:x}", addr);
@@ -73,11 +56,7 @@ impl Cpu {
                     self.registers.set_a(data);
                 }
 
-                _ => todo!(
-                    "Haven't implented instruction: {:08b}, segments: {:?}",
-                    instruction,
-                    segments
-                ),
+                _ => todo!("Haven't implented instruction: {:08b}", instruction_byte,),
             };
         }
 
@@ -167,34 +146,6 @@ impl Instruction {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct InstructionSegments {
-    x: u8,
-    y: u8,
-    z: u8,
-    p: u8,
-    q: bool,
-}
-
-
-impl InstructionSegments {
-    pub fn from_instruction(instruction: u8) -> Self {
-        // http://z80.info/decoding.htm
-        // x = the opcode's 1st octal digit (i.e. bits 7-6)
-        // y = the opcode's 2nd octal digit (i.e. bits 5-3)
-        // z = the opcode's 3rd octal digit (i.e. bits 2-0)
-        // p = y rightshifted one position (i.e. bits 5-4)
-        // q = y modulo 2 (i.e. bit 3)
-        let x = instruction >> 6;
-        let y = (instruction & 63) >> 3; // 00111111 = 63 (discard top 2 bits)
-        let z = instruction & 7; // 00000111 = 63 (discard top 5 bits)
-        let p = y >> 1;
-        let q = is_bit_set_u8(y, 0);
-
-        Self { x, y, z, p, q }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{cpu::Instruction, instructions::HALT, registers::R16};
@@ -258,13 +209,10 @@ mod tests {
         // ld [r16mem], a
         for instruction in opcode_list!(00__0010) {
             let mut cpu = Cpu::new();
-            cpu.memory.memory[..2].copy_from_slice(&[
-                instruction,
-                HALT,
-            ]);
+            cpu.memory.memory[..2].copy_from_slice(&[instruction, HALT]);
             cpu.registers.set_a(0b10110101);
             let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
-                               //
+            //
             let p = Instruction(instruction).p();
             cpu.registers.set_r16(p.try_into().unwrap(), addr);
             cpu.process_instructions()
@@ -280,10 +228,7 @@ mod tests {
         // ld a, [r16mem]
         for instruction in opcode_list!(00__1010) {
             let mut cpu = Cpu::new();
-            cpu.memory.memory[..2].copy_from_slice(&[
-                instruction,
-                HALT,
-            ]);
+            cpu.memory.memory[..2].copy_from_slice(&[instruction, HALT]);
 
             let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
 

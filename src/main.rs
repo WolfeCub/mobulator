@@ -1,4 +1,4 @@
-use mobulator_macros::{opcode_list, opcode_match};
+use mobulator_macros::opcode_match;
 
 fn main() {
     let instruction = 1;
