@@ -200,7 +200,7 @@ impl InstructionSegments {
 
 #[cfg(test)]
 mod tests {
-    use crate::{cpu::Instruction, registers::R16};
+    use crate::{cpu::Instruction, instructions::HALT, registers::R16};
 
     use super::Cpu;
 
@@ -242,7 +242,7 @@ mod tests {
                 // Swapped order. Little endian
                 0b00111100,
                 0b10111100,
-                0b01110110, // Halt
+                HALT,
             ]);
             cpu.process_instructions()
                 .expect("Unable to process CPU instructions");
@@ -267,7 +267,7 @@ mod tests {
             let mut cpu = Cpu::new();
             cpu.memory.memory[..2].copy_from_slice(&[
                 instruction,
-                0b01110110, // Halt
+                HALT,
             ]);
             cpu.registers.set_a(0b10110101);
             let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
@@ -290,7 +290,7 @@ mod tests {
             let mut cpu = Cpu::new();
             cpu.memory.memory[..2].copy_from_slice(&[
                 instruction,
-                0b01110110, // Halt
+                HALT,
             ]);
 
             let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
