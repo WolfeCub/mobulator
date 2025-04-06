@@ -1,9 +1,9 @@
-use mobulator_macros::instructions;
+use mobulator_macros::{opcode_list, opcode_match};
 
 fn main() {
-    let instruction = 50;
+    let instruction = 1;
     match instruction {
-        instructions!(00__0010) => {
+        opcode_match!(00__0001) => {
             println!("It matches");
         }
         _ => {

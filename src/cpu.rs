@@ -1,4 +1,5 @@
 use anyhow::Context;
+use mobulator_macros::opcode_match;
 
 use crate::{instructions::*, registers::Registers, utils::is_bit_set_u8};
 
@@ -19,24 +20,15 @@ impl Cpu {
     pub fn process_instructions(&mut self) -> anyhow::Result<()> {
         while let Some(instruction) = self.next() {
             // Match instructions that don't have any "variables"
+            dbg!(instruction);
             match instruction {
                 NOOP => (),
                 HALT => {
                     return Ok(());
-                }
-                _ => {}
-            };
-
-            let segments = InstructionSegments::from_instruction(instruction);
-            match segments {
+                },
                 // ld r16, imm16
-                InstructionSegments {
-                    x: 0,
-                    q: false,
-                    z: 1,
-                    p,
-                    ..
-                } => {
+                opcode_match!(00__0001) => {
+                    let instruction = Instruction(instruction);
                     let first_byte = self
                         .next()
                         .context("Unable to read next byte after imm16")?;
@@ -45,9 +37,14 @@ impl Cpu {
                         .context("Unable to read next byte after imm16")?;
 
                     let joint = u16::from_le_bytes([first_byte, second_byte]);
-                    self.registers.set_r16(p.try_into()?, joint);
+                    self.registers.set_r16(instruction.p().try_into()?, joint);
+                    return Ok(());
                 }
+                _ => { }
+            };
 
+            let segments = InstructionSegments::from_instruction(instruction);
+            match segments {
                 // ld [r16mem], a
                 InstructionSegments {
                     x: 0,
@@ -201,6 +198,7 @@ impl InstructionSegments {
 #[cfg(test)]
 mod tests {
     use crate::{cpu::Instruction, instructions::HALT, registers::R16};
+    use mobulator_macros::opcode_list;
 
     use super::Cpu;
 
@@ -232,10 +230,7 @@ mod tests {
     #[test]
     fn ld_r16_imm16() {
         // 00_[r16]0_001
-        for i in 0..4 {
-            let instruction = u8::from_str_radix(&format!("00{:02b}0001", i), 2)
-                .expect("Unable to parse generated number");
-
+        for instruction in opcode_list!(00__0001) {
             let mut cpu = Cpu::new();
             cpu.memory.memory[..4].copy_from_slice(&[
                 instruction,
@@ -247,7 +242,8 @@ mod tests {
             cpu.process_instructions()
                 .expect("Unable to process CPU instructions");
 
-            let target = match R16::try_from(i).expect("Used invalid R16 register") {
+            let p = Instruction(instruction).p();
+            let target = match R16::try_from(p).expect("Used invalid R16 register") {
                 R16::BC => cpu.registers.bc,
                 R16::DE => cpu.registers.de,
                 R16::HL => cpu.registers.hl,
@@ -260,10 +256,7 @@ mod tests {
     #[test]
     fn ld_r16mem_a() {
         // ld [r16mem], a
-        for i in 0..4 {
-            let instruction = u8::from_str_radix(&format!("00{:02b}0010", i), 2)
-                .expect("Unable to parse generated number");
-
+        for instruction in opcode_list!(00__0010) {
             let mut cpu = Cpu::new();
             cpu.memory.memory[..2].copy_from_slice(&[
                 instruction,
@@ -271,7 +264,9 @@ mod tests {
             ]);
             cpu.registers.set_a(0b10110101);
             let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
-            cpu.registers.set_r16(i.try_into().unwrap(), addr);
+                               //
+            let p = Instruction(instruction).p();
+            cpu.registers.set_r16(p.try_into().unwrap(), addr);
             cpu.process_instructions()
                 .expect("Unable to process CPU instructions");
 
@@ -283,10 +278,7 @@ mod tests {
     #[test]
     fn ld_a_r16mem() {
         // ld a, [r16mem]
-        for i in 0..4 {
-            let instruction = u8::from_str_radix(&format!("00{:02b}1010", i), 2)
-                .expect("Unable to parse generated number");
-
+        for instruction in opcode_list!(00__1010) {
             let mut cpu = Cpu::new();
             cpu.memory.memory[..2].copy_from_slice(&[
                 instruction,
@@ -294,7 +286,9 @@ mod tests {
             ]);
 
             let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
-            cpu.registers.set_r16(i.try_into().unwrap(), addr);
+
+            let p = Instruction(instruction).p();
+            cpu.registers.set_r16(p.try_into().unwrap(), addr);
             cpu.memory.memory[usize::from(addr / 8)] = 0x6F;
 
             cpu.process_instructions()
