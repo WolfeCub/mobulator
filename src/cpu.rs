@@ -57,6 +57,23 @@ impl Cpu {
                     self.memory.set_byte(addr + 8, high);
                 }
 
+                // inc r16
+                opcode_match!(00__0011) => {
+                    let reg_val = self.registers.get_r16_mut(instruction.p().try_into()?);
+                    *reg_val += 1
+                }
+
+                // dec r16
+                opcode_match!(00__1011) => {
+                    let reg_val = self.registers.get_r16_mut(instruction.p().try_into()?);
+                    *reg_val -= 1
+                }
+
+                // add hl, r16
+                opcode_match!(00__1001) => {
+                    self.registers.hl += self.registers.get_r16(instruction.p().try_into()?);
+                }
+
                 _ => todo!("Haven't implented instruction: {:08b}", instruction_byte,),
             };
         }
@@ -100,7 +117,7 @@ impl Iterator for Cpu {
 /// 0xFF80 - 0xFFFE: High RAM Area
 /// 0xFFFF: Interrupt Enabled Register
 #[derive(Debug, Clone)]
-struct Memory {
+pub struct Memory {
     memory: [u8; 0xFFFF],
 }
 
@@ -276,6 +293,7 @@ mod tests {
             assert_eq!(cpu.registers.a(), 0x6F);
         }
     }
+
     #[test]
     fn ld_imm16_sp() {
         // ld [imm16], sp
@@ -283,7 +301,8 @@ mod tests {
 
         let addr: u16 = 0xDC17; // 0xC000 - 0xDFFF working mem
         let [first, second] = addr.to_le_bytes();
-        cpu.memory.load_instructions(&[LD_IMM16_SP, first, second, HALT]);
+        cpu.memory
+            .load_instructions(&[LD_IMM16_SP, first, second, HALT]);
 
         cpu.registers.sp = 0b11101011_10001001;
 
@@ -294,5 +313,49 @@ mod tests {
         let second_mem_val = cpu.memory.memory[usize::from(addr / 8) + 1];
         assert_eq!(first_mem_val, 0b10001001);
         assert_eq!(second_mem_val, 0b11101011);
+    }
+
+    #[test]
+    fn inc_dec_r16() {
+        // inc r16
+        // dec r16
+        for instruction in opcode_list!(00___011) {
+            let mut cpu = Cpu::new();
+            cpu.memory.load_instructions(&[instruction, HALT]);
+
+            let instruction = Instruction(instruction);
+            let reg = instruction.p().try_into().expect("Invalid r16");
+            cpu.registers.set_r16(reg, 1337);
+
+            cpu.process_instructions()
+                .expect("Unable to process CPU instructions");
+
+            let num = if instruction.q() { 1336 } else { 1338 };
+            assert_eq!(cpu.registers.get_r16(reg), num);
+        }
+    }
+
+    #[test]
+    fn add_hl_r16() {
+        // add hl, r16
+        for instruction in opcode_list!(00__1001) {
+            let mut cpu = Cpu::new();
+            cpu.memory.load_instructions(&[instruction, HALT]);
+
+            let instruction = Instruction(instruction);
+            let reg = instruction.p().try_into().expect("Invalid r16");
+            cpu.registers.set_r16(reg, 1337);
+            cpu.registers.hl = 2424;
+
+            cpu.process_instructions()
+                .expect("Unable to process CPU instructions");
+
+            // if r16 is register HL then we double our value rather than adding from another reg
+            let target = match reg {
+                R16::HL => 2424 + 2424,
+                _ => 1337 + 2424,
+            };
+            assert_eq!(cpu.registers.hl, target);
+        }
     }
 }
