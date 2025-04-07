@@ -29,15 +29,8 @@ impl Cpu {
 
                 // ld r16, imm16
                 opcode_match!(00__0001) => {
-                    let first_byte = self
-                        .next()
-                        .context("Unable to read next byte after imm16")?;
-                    let second_byte = self
-                        .next()
-                        .context("Unable to read next byte after imm16")?;
-
-                    let joint = u16::from_le_bytes([first_byte, second_byte]);
-                    self.registers.set_r16(instruction.p().try_into()?, joint);
+                    let data = self.imm16()?;
+                    self.registers.set_r16(instruction.p().try_into()?, data);
                 }
 
                 // ld [r16mem], a
@@ -56,11 +49,30 @@ impl Cpu {
                     self.registers.set_a(data);
                 }
 
+                // ld [imm16], sp
+                LD_IMM16_SP => {
+                    let addr = self.imm16()?;
+                    let [high, low] = self.registers.sp.to_be_bytes();
+                    self.memory.set_byte(addr, low);
+                    self.memory.set_byte(addr + 8, high);
+                }
+
                 _ => todo!("Haven't implented instruction: {:08b}", instruction_byte,),
             };
         }
 
         Ok(())
+    }
+
+    fn imm16(&mut self) -> anyhow::Result<u16> {
+        let first_byte = self
+            .next()
+            .context("Unable to read first byte after imm16")?;
+        let second_byte = self
+            .next()
+            .context("Unable to read second byte after imm16")?;
+        let joint = u16::from_le_bytes([first_byte, second_byte]);
+        Ok(joint)
     }
 }
 
@@ -148,7 +160,11 @@ impl Instruction {
 
 #[cfg(test)]
 mod tests {
-    use crate::{cpu::Instruction, instructions::HALT, registers::R16};
+    use crate::{
+        cpu::Instruction,
+        instructions::{HALT, LD_IMM16_SP},
+        registers::R16,
+    };
     use mobulator_macros::opcode_list;
 
     use super::Cpu;
@@ -212,7 +228,7 @@ mod tests {
             cpu.memory.memory[..2].copy_from_slice(&[instruction, HALT]);
             cpu.registers.set_a(0b10110101);
             let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
-            //
+
             let p = Instruction(instruction).p();
             cpu.registers.set_r16(p.try_into().unwrap(), addr);
             cpu.process_instructions()
@@ -241,5 +257,24 @@ mod tests {
 
             assert_eq!(cpu.registers.a(), 0x6F);
         }
+    }
+    #[test]
+    fn ld_imm16_sp() {
+        // ld [imm16], sp
+        let mut cpu = Cpu::new();
+
+        let addr: u16 = 0xDC17; // 0xC000 - 0xDFFF working mem
+        let [first, second] = addr.to_le_bytes();
+        cpu.memory.memory[..4].copy_from_slice(&[LD_IMM16_SP, first, second, HALT]);
+
+        cpu.registers.sp = 0b11101011_10001001;
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        let first_mem_val = cpu.memory.memory[usize::from(addr / 8)];
+        let second_mem_val = cpu.memory.memory[usize::from(addr / 8) + 1];
+        assert_eq!(first_mem_val, 0b10001001);
+        assert_eq!(second_mem_val, 0b11101011);
     }
 }
