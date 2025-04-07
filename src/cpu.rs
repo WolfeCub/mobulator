@@ -112,11 +112,17 @@ impl Memory {
     }
 
     pub fn get_byte(&self, addr: u16) -> Option<u8> {
-        self.memory.get(usize::from(addr / 8)).copied()
+        self.memory
+            .get(usize::from(addr / u8::BITS as u16))
+            .copied()
     }
 
     pub fn set_byte(&mut self, addr: u16, value: u8) {
-        self.memory[usize::from(addr / 8)] = value;
+        self.memory[usize::from(addr / u8::BITS as u16)] = value;
+    }
+
+    pub fn load_instructions(&mut self, instructions: &[u8]) {
+        self.memory[..instructions.len()].copy_from_slice(instructions);
     }
 }
 
@@ -167,7 +173,7 @@ mod tests {
     };
     use mobulator_macros::opcode_list;
 
-    use super::Cpu;
+    use super::{Cpu, Memory};
 
     #[test]
     fn decoder() {
@@ -195,11 +201,23 @@ mod tests {
     }
 
     #[test]
+    fn memory_get_set_bytes() {
+        let mut mem = Memory::new();
+
+        let addr = 0xC7D1; // 0xC000 - 0xDFFF working mem
+        let val = 0x1F;
+        mem.set_byte(addr, val);
+
+        assert_eq!(mem.get_byte(addr).expect("Unable to get byte"), val);
+        assert_eq!(mem.memory[usize::from(addr) / 8], val);
+    }
+
+    #[test]
     fn ld_r16_imm16() {
         // 00_[r16]0_001
         for instruction in opcode_list!(00__0001) {
             let mut cpu = Cpu::new();
-            cpu.memory.memory[..4].copy_from_slice(&[
+            cpu.memory.load_instructions(&[
                 instruction,
                 // Swapped order. Little endian
                 0b00111100,
@@ -225,7 +243,7 @@ mod tests {
         // ld [r16mem], a
         for instruction in opcode_list!(00__0010) {
             let mut cpu = Cpu::new();
-            cpu.memory.memory[..2].copy_from_slice(&[instruction, HALT]);
+            cpu.memory.load_instructions(&[instruction, HALT]);
             cpu.registers.set_a(0b10110101);
             let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
 
@@ -244,7 +262,7 @@ mod tests {
         // ld a, [r16mem]
         for instruction in opcode_list!(00__1010) {
             let mut cpu = Cpu::new();
-            cpu.memory.memory[..2].copy_from_slice(&[instruction, HALT]);
+            cpu.memory.load_instructions(&[instruction, HALT]);
 
             let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
 
@@ -265,7 +283,7 @@ mod tests {
 
         let addr: u16 = 0xDC17; // 0xC000 - 0xDFFF working mem
         let [first, second] = addr.to_le_bytes();
-        cpu.memory.memory[..4].copy_from_slice(&[LD_IMM16_SP, first, second, HALT]);
+        cpu.memory.load_instructions(&[LD_IMM16_SP, first, second, HALT]);
 
         cpu.registers.sp = 0b11101011_10001001;
 
