@@ -72,12 +72,21 @@ impl Registers {
         }
     }
 
-    pub fn get_r16(&mut self, r16: R16) -> u16 {
+    pub fn get_r16(&self, r16: R16) -> u16 {
         match r16 {
             R16::BC => self.bc,
             R16::DE => self.de,
             R16::HL => self.hl,
             R16::SP => self.sp,
+        }
+    }
+
+    pub fn get_r16_mut(&mut self, r16: R16) -> &mut u16 {
+        match r16 {
+            R16::BC => &mut self.bc,
+            R16::DE => &mut self.de,
+            R16::HL => &mut self.hl,
+            R16::SP => &mut self.sp,
         }
     }
 }
@@ -109,6 +118,7 @@ pub enum R8 {
     A = 7,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum R16 {
     BC,
     DE,
