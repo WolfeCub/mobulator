@@ -54,7 +54,7 @@ impl Cpu {
                     let addr = self.imm16()?;
                     let [high, low] = self.registers.sp.to_be_bytes();
                     self.memory.set_byte(addr, low);
-                    self.memory.set_byte(addr + 8, high);
+                    self.memory.set_byte(addr + 1, high);
                 }
 
                 // inc r16
@@ -98,7 +98,7 @@ impl Iterator for Cpu {
 
     fn next(&mut self) -> Option<Self::Item> {
         let byte = self.memory.get_byte(self.registers.pc);
-        self.registers.pc += 8;
+        self.registers.pc += 1;
         byte
     }
 }
@@ -130,12 +130,12 @@ impl Memory {
 
     pub fn get_byte(&self, addr: u16) -> Option<u8> {
         self.memory
-            .get(usize::from(addr / u8::BITS as u16))
+            .get(usize::from(addr))
             .copied()
     }
 
     pub fn set_byte(&mut self, addr: u16, value: u8) {
-        self.memory[usize::from(addr / u8::BITS as u16)] = value;
+        self.memory[usize::from(addr)] = value;
     }
 
     pub fn load_instructions(&mut self, instructions: &[u8]) {
@@ -226,7 +226,7 @@ mod tests {
         mem.set_byte(addr, val);
 
         assert_eq!(mem.get_byte(addr).expect("Unable to get byte"), val);
-        assert_eq!(mem.memory[usize::from(addr) / 8], val);
+        assert_eq!(mem.memory[usize::from(addr)], val);
     }
 
     #[test]
@@ -269,8 +269,7 @@ mod tests {
             cpu.process_instructions()
                 .expect("Unable to process CPU instructions");
 
-            let mem_val = cpu.memory.memory[usize::from(addr / 8)];
-            assert_eq!(mem_val, 0b10110101);
+            assert_eq!(cpu.memory.get_byte(addr).expect("Byte exists"), 0b10110101);
         }
     }
 
@@ -285,7 +284,7 @@ mod tests {
 
             let p = Instruction(instruction).p();
             cpu.registers.set_r16(p.try_into().unwrap(), addr);
-            cpu.memory.memory[usize::from(addr / 8)] = 0x6F;
+            cpu.memory.set_byte(addr, 0x6F);
 
             cpu.process_instructions()
                 .expect("Unable to process CPU instructions");
@@ -309,8 +308,8 @@ mod tests {
         cpu.process_instructions()
             .expect("Unable to process CPU instructions");
 
-        let first_mem_val = cpu.memory.memory[usize::from(addr / 8)];
-        let second_mem_val = cpu.memory.memory[usize::from(addr / 8) + 1];
+        let first_mem_val = cpu.memory.get_byte(addr).expect("Byte exists");
+        let second_mem_val = cpu.memory.get_byte(addr + 1).expect("Byte exists");
         assert_eq!(first_mem_val, 0b10001001);
         assert_eq!(second_mem_val, 0b11101011);
     }
