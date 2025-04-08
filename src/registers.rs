@@ -1,4 +1,4 @@
-use crate::utils::{high_u8, is_bit_set_u16, set_high_u8};
+use crate::{utils::{high_u8, is_bit_set_u16, set_high_u8}};
 
 // https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
 #[derive(Debug, Clone, Default)]
