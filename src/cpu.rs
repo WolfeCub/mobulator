@@ -1,7 +1,7 @@
 use anyhow::Context;
 use mobulator_macros::opcode_match;
 
-use crate::{instructions::*, registers::Registers, utils::is_bit_set_u8};
+use crate::{instruction::Instruction, instructions::*, memory::Memory, registers::Registers};
 
 #[derive(Debug, Clone)]
 pub struct Cpu {
@@ -103,131 +103,14 @@ impl Iterator for Cpu {
     }
 }
 
-/// 0x0000 - 0x00FF: Boot ROM
-/// 0x0000 - 0x3FFF: Game ROM Bank 0
-/// 0x4000 - 0x7FFF: Game ROM Bank N
-/// 0x8000 - 0x97FF: Tile RAM
-/// 0x9800 - 0x9FFF: Background Map
-/// 0xA000 - 0xBFFF: Cartridge RAM
-/// 0xC000 - 0xDFFF: Working RAM
-/// 0xE000 - 0xFDFF: Echo RAM
-/// 0xFE00 - 0xFE9F: OAM (Object Atribute Memory)
-/// 0xFEA0 - 0xFEFF: Unused
-/// 0xFF00 - 0xFF7F: I/O Registers
-/// 0xFF80 - 0xFFFE: High RAM Area
-/// 0xFFFF: Interrupt Enabled Register
-#[derive(Debug, Clone)]
-pub struct Memory {
-    memory: [u8; 0xFFFF],
-}
-
-impl Memory {
-    pub fn new() -> Self {
-        Self {
-            memory: [0; 0xFFFF],
-        }
-    }
-
-    pub fn get_byte(&self, addr: u16) -> Option<u8> {
-        self.memory
-            .get(usize::from(addr))
-            .copied()
-    }
-
-    pub fn set_byte(&mut self, addr: u16, value: u8) {
-        self.memory[usize::from(addr)] = value;
-    }
-
-    pub fn load_instructions(&mut self, instructions: &[u8]) {
-        self.memory[..instructions.len()].copy_from_slice(instructions);
-    }
-}
-
-/// ┌───┬───┬───┬───┬───┬───┬───┬───┐
-/// │ 7 │ 6 │ 5 │ 4 │ 3 │ 2 │ 1 │ 0 │
-/// └───┴───┴───┴───┴───┴───┴───┴───┘
-///   └───┘   └───────┘   └───────┘
-///     x         y           z
-///           └───┘   |
-///             p     q
-#[derive(Debug, Clone, Copy)]
-pub struct Instruction(u8);
-
-// http://z80.info/decoding.htm
-// x = the opcode's 1st octal digit (i.e. bits 7-6)
-// y = the opcode's 2nd octal digit (i.e. bits 5-3)
-// z = the opcode's 3rd octal digit (i.e. bits 2-0)
-// p = y rightshifted one position (i.e. bits 5-4)
-// q = y modulo 2 (i.e. bit 3)
-impl Instruction {
-    pub fn x(&self) -> u8 {
-        self.0 >> 6
-    }
-
-    pub fn y(&self) -> u8 {
-        (self.0 & 0b00111111) >> 3
-    }
-
-    pub fn z(&self) -> u8 {
-        self.0 & 0b00000111
-    }
-
-    pub fn p(&self) -> u8 {
-        (self.0 >> 4) & 0b00000011
-    }
-
-    pub fn q(&self) -> bool {
-        is_bit_set_u8(self.0, 3)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
-        cpu::Instruction,
-        instructions::{HALT, LD_IMM16_SP},
-        registers::R16,
+        instruction::Instruction, instructions::{HALT, LD_IMM16_SP}, registers::R16
     };
     use mobulator_macros::opcode_list;
 
-    use super::{Cpu, Memory};
-
-    #[test]
-    fn decoder() {
-        // 01_110_010
-        //  x|  y|  z
-        //    110
-        //    p|q
-        let segs = Instruction(0b01_110_010);
-        assert_eq!(segs.x(), 0b01);
-        assert_eq!(segs.y(), 0b110);
-        assert_eq!(segs.z(), 0b010);
-        assert_eq!(segs.p(), 0b11);
-        assert_eq!(segs.q(), false);
-
-        // 11_101_101
-        //  x|  y|  z
-        //    101
-        //    p|q
-        let segs = Instruction(0b11_101_101);
-        assert_eq!(segs.x(), 0b11);
-        assert_eq!(segs.y(), 0b101);
-        assert_eq!(segs.z(), 0b101);
-        assert_eq!(segs.p(), 0b10);
-        assert_eq!(segs.q(), true);
-    }
-
-    #[test]
-    fn memory_get_set_bytes() {
-        let mut mem = Memory::new();
-
-        let addr = 0xC7D1; // 0xC000 - 0xDFFF working mem
-        let val = 0x1F;
-        mem.set_byte(addr, val);
-
-        assert_eq!(mem.get_byte(addr).expect("Unable to get byte"), val);
-        assert_eq!(mem.memory[usize::from(addr)], val);
-    }
+    use super::Cpu;
 
     #[test]
     fn ld_r16_imm16() {
