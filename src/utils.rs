@@ -15,14 +15,11 @@ pub(crate) const fn is_bit_set_u16(number: u16, bit: u32) -> bool {
     (number & calc_nth_bit_power(bit)) != 0
 }
 
-pub(crate) const fn high_u8(number: u16) -> u8 {
-    let [high, _] = number.to_be_bytes();
-    high
-}
-
 pub trait RegisterU16Ext {
     fn set_high(&mut self, value: u8);
     fn set_low(&mut self, value: u8);
+    fn high_u8(&self) -> u8;
+    fn set_bit(&mut self, bit: u32);
 }
 
 impl RegisterU16Ext for u16 {
@@ -34,6 +31,15 @@ impl RegisterU16Ext for u16 {
     fn set_low(&mut self, value: u8) {
         *self &= 0b11111111_00000000;
         *self |= value as u16;
+    }
+
+    fn high_u8(&self) -> u8{
+        let [high, _] = self.to_be_bytes();
+        high
+    }
+
+    fn set_bit(&mut self, bit: u32) {
+        *self |= calc_nth_bit_power(bit)
     }
 }
 
