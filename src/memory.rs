@@ -16,17 +16,26 @@ pub struct Memory {
     pub memory: [u8; 0xFFFF],
 }
 
-impl Memory {
-    pub fn new() -> Self {
+impl Default for Memory {
+    fn default() -> Self {
         Self {
             memory: [0; 0xFFFF],
         }
     }
+}
 
-    pub fn get_byte(&self, addr: u16) -> Option<u8> {
+impl Memory {
+    pub fn get_byte(&self, addr: u16) -> anyhow::Result<u8> {
         self.memory
             .get(usize::from(addr))
             .copied()
+            .ok_or_else(|| anyhow::anyhow!("Out of bounds memory access at {:x}", addr))
+    }
+
+    pub fn get_byte_mut(&mut self, addr: u16) -> anyhow::Result<&mut u8> {
+        self.memory
+            .get_mut(usize::from(addr))
+            .ok_or_else(|| anyhow::anyhow!("Out of bounds memory access at {:x}", addr))
     }
 
     pub fn set_byte(&mut self, addr: u16, value: u8) {
@@ -44,7 +53,7 @@ mod tests {
 
     #[test]
     fn memory_get_set_bytes() {
-        let mut mem = Memory::new();
+        let mut mem = Memory::default();
 
         let addr = 0xC7D1; // 0xC000 - 0xDFFF working mem
         let val = 0x1F;
