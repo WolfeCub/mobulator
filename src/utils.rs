@@ -20,24 +20,48 @@ pub(crate) const fn high_u8(number: u16) -> u8 {
     high
 }
 
-pub(crate) const fn set_high_u8(number: &mut u16, val: u8) {
-    *number &= 0b00000000_11111111;
-    *number |= (val as u16) << 8;
+pub trait RegisterU16Ext {
+    fn set_high(&mut self, value: u8);
+    fn set_low(&mut self, value: u8);
+}
+
+impl RegisterU16Ext for u16 {
+    fn set_high(&mut self, value: u8) {
+        *self &= 0b00000000_11111111;
+        *self |= (value as u16) << 8;
+    }
+
+    fn set_low(&mut self, value: u8) {
+        *self &= 0b11111111_00000000;
+        *self |= value as u16;
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use super::set_high_u8;
+    use crate::utils::RegisterU16Ext;
 
     #[test]
     fn test_set_high() {
-        let mut target = 0b10110001_10001110;
+        let mut target: u16 = 0b10110001_10001110;
         let new_val = 0b11101010;
 
-        set_high_u8(&mut target, new_val);
+        target.set_high(new_val);
         let [high, low] = target.to_be_bytes();
 
         assert_eq!(high, new_val);
         assert_eq!(low, 0b10001110);
+    }
+
+    #[test]
+    fn test_set_low() {
+        let mut target: u16 = 0b10110001_10001110;
+        let new_val = 0b11101010;
+
+        target.set_low(new_val);
+        let [high, low] = target.to_be_bytes();
+
+        assert_eq!(low, new_val);
+        assert_eq!(high, 0b10110001);
     }
 }

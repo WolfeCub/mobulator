@@ -1,3 +1,14 @@
 pub const NOOP: u8 = 0b00000000;
 pub const HALT: u8 = 0b01110110;
 pub const LD_IMM16_SP: u8 = 0b00001000;
+pub const INC_HL: u8 = 0b00110100;
+pub const DEC_HL: u8 = 0b00110101;
+pub const LD_HL_IMM8: u8 = 0b00110110;
+pub const RLCA: u8 = 0b00000111;
+pub const RRCA: u8 = 0b00001111;
+pub const RLA: u8 = 0b00010111;
+pub const RRA: u8 = 0b00011111;
+pub const DAA: u8 = 0b00100111;
+pub const CPL: u8 = 0b00101111;
+pub const SCF: u8 = 0b00110111;
+pub const CCF: u8 = 0b00111111;
