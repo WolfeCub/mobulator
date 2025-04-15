@@ -1,4 +1,4 @@
-use crate::utils::{high_u8, is_bit_set_u16, RegisterU16Ext};
+use crate::utils::{is_bit_set_u16, RegisterU16Ext};
 
 // https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
 #[derive(Debug, Clone, Default)]
@@ -16,7 +16,7 @@ pub struct Registers {
 
 impl Registers {
     pub fn a(&self) -> u8 {
-        high_u8(self.af)
+        self.af.high_u8()
     }
 
     pub fn set_a(&mut self, val: u8) {
@@ -40,7 +40,7 @@ impl Registers {
     }
 
     pub fn b(&self) -> u8 {
-        high_u8(self.bc)
+        self.bc.high_u8()
     }
 
     pub fn c(&self) -> u8 {
@@ -48,7 +48,7 @@ impl Registers {
     }
 
     pub fn d(&self) -> u8 {
-        high_u8(self.de)
+        self.de.high_u8()
     }
 
     pub fn e(&self) -> u8 {
@@ -56,7 +56,7 @@ impl Registers {
     }
 
     pub fn h(&self) -> u8 {
-        high_u8(self.hl)
+        self.hl.high_u8()
     }
 
     pub fn l(&self) -> u8 {
@@ -240,14 +240,13 @@ pub enum Cond {
 // TODO: Test more thoroughly
 #[cfg(test)]
 mod tests {
-    use crate::registers::R16Mem;
+    use crate::registers::{R16Mem, R8};
 
     use super::Registers;
 
     #[test]
     fn b_registers() {
-        // 00000101_00001010
-        let r = Registers {
+        let mut r = Registers {
             af: 0b00000101_00001010,
             bc: 0b00000101_00001010,
             de: 0b00000101_00001010,
@@ -265,11 +264,16 @@ mod tests {
 
         assert_eq!(r.h(), 0b00000101);
         assert_eq!(r.l(), 0b00001010);
+
+        r.set_r8(R8::C, 0b10111100);
+        assert_eq!(r.bc, 0b00000101_10111100);
+
+        r.set_r8(R8::D, 0b10111100);
+        assert_eq!(r.de, 0b10111100_00001010);
     }
 
     #[test]
     fn flags() {
-        // 00000000_10000000
         let r = Registers {
             af: 0b00000000_10000000,
             ..Default::default()
