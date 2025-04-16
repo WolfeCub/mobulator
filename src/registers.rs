@@ -27,16 +27,32 @@ impl Registers {
         is_bit_set_u16(self.af, 7)
     }
 
+    pub fn set_z_flg(&mut self, value: bool) {
+        self.af.set_bit(7, value);
+    }
+
     pub fn n_flg(&self) -> bool {
         is_bit_set_u16(self.af, 6)
+    }
+
+    pub fn set_n_flg(&mut self, value: bool) {
+        self.af.set_bit(6, value);
     }
 
     pub fn h_flg(&self) -> bool {
         is_bit_set_u16(self.af, 5)
     }
 
+    pub fn set_h_flg(&mut self, value: bool) {
+        self.af.set_bit(5, value)
+    }
+
     pub fn c_flg(&self) -> bool {
         is_bit_set_u16(self.af, 4)
+    }
+
+    pub fn set_c_flg(&mut self, value: bool) {
+        self.af.set_bit(4, value)
     }
 
     pub fn b(&self) -> u8 {

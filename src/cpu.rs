@@ -1,7 +1,13 @@
 use anyhow::Context;
 use mobulator_macros::opcode_match;
 
-use crate::{instruction::Instruction, instructions::*, memory::Memory, registers::Registers};
+use crate::{
+    instruction::Instruction,
+    instructions::*,
+    memory::Memory,
+    registers::Registers,
+    utils::{half_carry_add_u8, half_carry_add_u16, half_carry_sub_u8},
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct Cpu {
@@ -50,43 +56,75 @@ impl Cpu {
 
                 // inc r16
                 opcode_match!(00__0011) => {
-                    let reg_val = self.registers.get_r16_mut(instruction.p().try_into()?);
-                    *reg_val += 1
+                    let register = instruction.p().try_into()?;
+                    let reg_val = self.registers.get_r16(register);
+                    let new_val = reg_val.wrapping_add(1);
+                    self.registers.set_r16(register, new_val);
                 }
 
                 // dec r16
                 opcode_match!(00__1011) => {
-                    let reg_val = self.registers.get_r16_mut(instruction.p().try_into()?);
-                    *reg_val -= 1
+                    let register = instruction.p().try_into()?;
+                    let reg_val = self.registers.get_r16(register);
+                    let new_val = reg_val.wrapping_sub(1);
+                    self.registers.set_r16(register, new_val);
                 }
 
                 // add hl, r16
                 opcode_match!(00__1001) => {
-                    self.registers.hl += self.registers.get_r16(instruction.p().try_into()?);
+                    let reg_val = self.registers.get_r16(instruction.p().try_into()?);
+                    let (result, overflow) = self.registers.hl.overflowing_add(reg_val);
+
+                    self.registers.set_n_flg(false);
+                    self.registers
+                        .set_h_flg(half_carry_add_u16(reg_val, self.registers.hl));
+                    self.registers.set_c_flg(overflow);
+
+                    self.registers.hl = result;
                 }
 
                 INC_HL => {
                     let addr = self.registers.hl;
-                    let byte = self.memory.get_byte_mut(addr)?;
-                    *byte += 1;
+                    let byte = self.memory.get_byte(addr)?;
+                    let value = byte.wrapping_add(1);
+                    self.memory.set_byte(addr, value);
+
+                    self.registers.set_z_flg(value == 0);
+                    self.registers.set_n_flg(false);
+                    self.registers.set_h_flg(half_carry_add_u8(byte, 1));
                 }
                 // inc r8
                 opcode_match!(00___100) => {
                     let r8 = instruction.y().try_into()?;
                     let val = self.registers.get_r8(r8);
-                    self.registers.set_r8(r8, val + 1);
+                    let new_val = val.wrapping_add(1);
+                    self.registers.set_r8(r8, new_val);
+
+                    self.registers.set_z_flg(new_val == 0);
+                    self.registers.set_n_flg(false);
+                    self.registers.set_h_flg(half_carry_add_u8(val, 1));
                 }
 
                 DEC_HL => {
                     let addr = self.registers.hl;
-                    let byte = self.memory.get_byte_mut(addr)?;
-                    *byte -= 1;
+                    let byte = self.memory.get_byte(addr)?;
+                    let value = byte.wrapping_sub(1);
+                    self.memory.set_byte(addr, value);
+
+                    self.registers.set_z_flg(value == 0);
+                    self.registers.set_n_flg(true);
+                    self.registers.set_h_flg(half_carry_sub_u8(byte, 1));
                 }
                 // dec r8
                 opcode_match!(00___101) => {
                     let r8 = instruction.y().try_into()?;
                     let val = self.registers.get_r8(r8);
-                    self.registers.set_r8(r8, val - 1);
+                    let new_val = val.wrapping_sub(1);
+                    self.registers.set_r8(r8, new_val);
+
+                    self.registers.set_z_flg(new_val == 0);
+                    self.registers.set_n_flg(true);
+                    self.registers.set_h_flg(half_carry_sub_u8(val, 1));
                 }
 
                 // ld r8, imm8
@@ -102,7 +140,6 @@ impl Cpu {
                 // rlca
                 // RCLA => {
                 // }
-
                 _ => todo!("Haven't implented instruction: {:08b}", instruction_byte,),
             };
         }
@@ -134,10 +171,12 @@ impl Iterator for Cpu {
 
 #[cfg(test)]
 mod tests {
+    use std::u16;
+
     use crate::{
         instruction::Instruction,
         instructions::{HALT, LD_HL_IMM8, LD_IMM16_SP},
-        registers::R16,
+        registers::{R8, R16},
     };
     use mobulator_macros::opcode_list;
 
@@ -275,7 +314,46 @@ mod tests {
                 _ => 1337 + 2424,
             };
             assert_eq!(cpu.registers.hl, target);
+            assert_eq!(cpu.registers.n_flg(), false);
+            assert_eq!(cpu.registers.c_flg(), false);
+            assert_eq!(cpu.registers.c_flg(), false);
         }
+    }
+
+    #[test]
+    fn add_hl_r16_flags() {
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[0b00001001, HALT]);
+
+        cpu.registers.bc = u16::MAX;
+        cpu.registers.hl = 2;
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.hl, 1);
+        assert_eq!(cpu.registers.c_flg(), true);
+        assert_eq!(cpu.registers.h_flg(), true);
+
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[0b00001001, HALT]);
+        cpu.registers.bc = 62 << 8;
+        cpu.registers.hl = 34 << 8;
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.h_flg(), true);
+
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[0b00001001, HALT]);
+        cpu.registers.bc = 1;
+        cpu.registers.hl = 2;
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.h_flg(), false);
     }
 
     #[test]
@@ -308,9 +386,41 @@ mod tests {
                     .expect("Unable to get byte")
             };
 
-            let num = if instruction.0 % 2 == 1 { 136 } else { 138 };
+            let (num, flg) = if instruction.0 % 2 == 1 {
+                (136, true)
+            } else {
+                (138, false)
+            };
             assert_eq!(val, num);
+            assert_eq!(cpu.registers.n_flg(), flg);
         }
+    }
+
+    #[test]
+    fn inc_dec_r8_flags() {
+        // inc
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[0b00000100, HALT]);
+
+        cpu.registers.set_r8(R8::B, 0b0000_1111);
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.h_flg(), true);
+        assert_eq!(cpu.registers.n_flg(), false);
+
+        // dec
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[0b00000101, HALT]);
+
+        cpu.registers.set_r8(R8::B, 0b0001_0000);
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.h_flg(), true);
+        assert_eq!(cpu.registers.n_flg(), true);
     }
 
     #[test]

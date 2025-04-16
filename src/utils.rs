@@ -2,7 +2,6 @@
 // "it usually isn’t necessary to apply #[inline] to private functions — within a crate, the
 // compiler generally makes good inline decisions."
 
-
 pub(crate) const fn calc_nth_bit_power(bit: u32) -> u16 {
     2u16.pow(bit)
 }
@@ -15,11 +14,27 @@ pub(crate) const fn is_bit_set_u16(number: u16, bit: u32) -> bool {
     (number & calc_nth_bit_power(bit)) != 0
 }
 
+pub(crate) const fn half_carry_add_u8(a: u8, b: u8) -> bool {
+    (((a & 0xF) + (b & 0xF)) & 0x10) == 0x10
+}
+
+pub(crate) const fn half_carry_add_u16(a: u16, b: u16) -> bool {
+    (((a & 0xFFF) + (b & 0xFFF)) & 0x1000) == 0x1000
+}
+
+pub(crate) const fn half_carry_sub_u8(a: u8, b: u8) -> bool {
+    a & 0x0F < b & 0x0F
+}
+
+pub(crate) const fn half_carry_sub_u16(a: u16, b: u16) -> bool {
+    a & 0x0F < b & 0x0F
+}
+
 pub trait RegisterU16Ext {
     fn set_high(&mut self, value: u8);
     fn set_low(&mut self, value: u8);
     fn high_u8(&self) -> u8;
-    fn set_bit(&mut self, bit: u32);
+    fn set_bit(&mut self, bit: u32, value: bool);
 }
 
 impl RegisterU16Ext for u16 {
@@ -33,13 +48,17 @@ impl RegisterU16Ext for u16 {
         *self |= value as u16;
     }
 
-    fn high_u8(&self) -> u8{
+    fn high_u8(&self) -> u8 {
         let [high, _] = self.to_be_bytes();
         high
     }
 
-    fn set_bit(&mut self, bit: u32) {
-        *self |= calc_nth_bit_power(bit)
+    fn set_bit(&mut self, bit: u32, value: bool) {
+        if value {
+            *self |= calc_nth_bit_power(bit);
+        } else {
+            *self &= !calc_nth_bit_power(bit);
+        }
     }
 }
 
