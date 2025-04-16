@@ -32,12 +32,6 @@ impl Memory {
             .ok_or_else(|| anyhow::anyhow!("Out of bounds memory access at {:x}", addr))
     }
 
-    pub fn get_byte_mut(&mut self, addr: u16) -> anyhow::Result<&mut u8> {
-        self.memory
-            .get_mut(usize::from(addr))
-            .ok_or_else(|| anyhow::anyhow!("Out of bounds memory access at {:x}", addr))
-    }
-
     pub fn set_byte(&mut self, addr: u16, value: u8) {
         self.memory[usize::from(addr)] = value;
     }
