@@ -6,7 +6,7 @@ use crate::{
     instructions::*,
     memory::Memory,
     registers::Registers,
-    utils::{half_carry_add_u8, half_carry_add_u16, half_carry_sub_u8},
+    utils::{half_carry_add_u16, half_carry_add_u8, half_carry_sub_u8, is_bit_set_u8},
 };
 
 #[derive(Debug, Clone, Default)]
@@ -120,8 +120,28 @@ impl Cpu {
                 }
 
                 // rlca
-                // RCLA => {
-                // }
+                RLCA => {
+                    let rotated = self.registers.a().rotate_left(1);
+                    self.registers.set_a(rotated);
+
+                    self.registers.set_z_flg(false);
+                    self.registers.set_n_flg(false);
+                    self.registers.set_h_flg(false);
+                    self.registers.set_c_flg(is_bit_set_u8(rotated, 0));
+                }
+
+                // rrca
+                RRCA => {
+                    let a = self.registers.a();
+                    let rotated = a.rotate_right(1);
+                    self.registers.set_a(rotated);
+
+                    self.registers.set_z_flg(false);
+                    self.registers.set_n_flg(false);
+                    self.registers.set_h_flg(false);
+                    self.registers.set_c_flg(is_bit_set_u8(a, 0));
+                }
+
                 _ => todo!("Haven't implented instruction: {:08b}", instruction_byte,),
             };
         }
@@ -166,7 +186,7 @@ mod tests {
 
     use crate::{
         instruction::Instruction,
-        instructions::{HALT, LD_HL_IMM8, LD_IMM16_SP},
+        instructions::*,
         registers::{R8, R16},
     };
     use mobulator_macros::opcode_list;
@@ -436,5 +456,63 @@ mod tests {
 
             assert_eq!(val, 0b00111100);
         }
+    }
+
+    #[test]
+    fn rlca() {
+        // rlca
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[RLCA, HALT]);
+
+        cpu.registers.af = 0b10011000_00000000;
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.a(), 0b00110001);
+        assert_eq!(cpu.registers.z_flg(), false);
+        assert_eq!(cpu.registers.n_flg(), false);
+        assert_eq!(cpu.registers.h_flg(), false);
+        assert_eq!(cpu.registers.c_flg(), true);
+
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[RLCA, HALT]);
+
+        cpu.registers.af = 0b00011000_00000000;
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.a(), 0b00110000);
+        assert_eq!(cpu.registers.c_flg(), false);
+    }
+
+    #[test]
+    fn rrca() {
+        // rrca
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[RRCA, HALT]);
+
+        cpu.registers.af = 0b10011000_00000000;
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.a(), 0b01001100);
+        assert_eq!(cpu.registers.z_flg(), false);
+        assert_eq!(cpu.registers.n_flg(), false);
+        assert_eq!(cpu.registers.h_flg(), false);
+        assert_eq!(cpu.registers.c_flg(), false);
+
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[RRCA, HALT]);
+
+        cpu.registers.af = 0b00011001_00000000;
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.a(), 0b10001100);
+        assert_eq!(cpu.registers.c_flg(), true);
     }
 }
