@@ -83,48 +83,30 @@ impl Cpu {
                     self.registers.hl = result;
                 }
 
-                INC_HL => {
+                INC_HL | DEC_HL => {
                     let addr = self.registers.hl;
                     let byte = self.memory.get_byte(addr)?;
-                    let value = byte.wrapping_add(1);
+
+                    let (value, carry_flag) = inc_or_dec(byte, instruction.0 == INC_HL);
                     self.memory.set_byte(addr, value);
 
                     self.registers.set_z_flg(value == 0);
-                    self.registers.set_n_flg(false);
-                    self.registers.set_h_flg(half_carry_add_u8(byte, 1));
+                    self.registers.set_n_flg(instruction.0 == DEC_HL);
+                    self.registers.set_h_flg(carry_flag);
                 }
                 // inc r8
-                opcode_match!(00___100) => {
-                    let r8 = instruction.y().try_into()?;
-                    let val = self.registers.get_r8(r8);
-                    let new_val = val.wrapping_add(1);
-                    self.registers.set_r8(r8, new_val);
-
-                    self.registers.set_z_flg(new_val == 0);
-                    self.registers.set_n_flg(false);
-                    self.registers.set_h_flg(half_carry_add_u8(val, 1));
-                }
-
-                DEC_HL => {
-                    let addr = self.registers.hl;
-                    let byte = self.memory.get_byte(addr)?;
-                    let value = byte.wrapping_sub(1);
-                    self.memory.set_byte(addr, value);
-
-                    self.registers.set_z_flg(value == 0);
-                    self.registers.set_n_flg(true);
-                    self.registers.set_h_flg(half_carry_sub_u8(byte, 1));
-                }
                 // dec r8
-                opcode_match!(00___101) => {
+                opcode_match!(00___100) | opcode_match!(00___101) => {
                     let r8 = instruction.y().try_into()?;
                     let val = self.registers.get_r8(r8);
-                    let new_val = val.wrapping_sub(1);
+
+                    let z = instruction.z();
+                    let (new_val, carry_flag) = inc_or_dec(val, z == 4);
                     self.registers.set_r8(r8, new_val);
 
                     self.registers.set_z_flg(new_val == 0);
-                    self.registers.set_n_flg(true);
-                    self.registers.set_h_flg(half_carry_sub_u8(val, 1));
+                    self.registers.set_n_flg(z == 5);
+                    self.registers.set_h_flg(carry_flag);
                 }
 
                 // ld r8, imm8
@@ -156,6 +138,15 @@ impl Cpu {
             .context("Unable to read second byte after imm16")?;
         let joint = u16::from_le_bytes([first_byte, second_byte]);
         Ok(joint)
+    }
+}
+
+// TODO: This is maybe a little dumb but it cleans up the code above.
+fn inc_or_dec(value: u8, add: bool) -> (u8, bool) {
+    if add {
+        (value.wrapping_add(1), half_carry_add_u8(value, 1))
+    } else {
+        (value.wrapping_sub(1), half_carry_sub_u8(value, 1))
     }
 }
 
