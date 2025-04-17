@@ -5,14 +5,14 @@ use crate::{
     instruction::Instruction,
     instructions::*,
     memory::Memory,
-    registers::Registers,
+    registers::{self, Registers},
     utils::{half_carry_add_u16, half_carry_add_u8, half_carry_sub_u8, is_bit_set_u8, SetBit},
 };
 
 #[derive(Debug, Clone, Default)]
 pub struct Cpu {
-    registers: Registers,
-    memory: Memory,
+    pub registers: Registers,
+    pub memory: Memory,
 }
 
 impl Cpu {
@@ -21,6 +21,7 @@ impl Cpu {
             let instruction = Instruction(instruction_byte);
             match instruction_byte {
                 NOOP => (),
+                LD_A_A => (),
 
                 HALT => {
                     return Ok(());
@@ -170,7 +171,11 @@ impl Cpu {
                     self.registers.set_c_flg(is_bit_set_u8(a, 0));
                 }
 
-                _ => todo!("Haven't implented instruction: {:08b}", instruction_byte,),
+                // daa
+                DAA => {
+                }
+
+                _ => anyhow::bail!("Haven't implented instruction: {:08b}", instruction_byte,),
             };
         }
 
