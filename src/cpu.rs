@@ -6,7 +6,7 @@ use crate::{
     instructions::*,
     memory::Memory,
     registers::Registers,
-    utils::{half_carry_add_u16, half_carry_add_u8, half_carry_sub_u8, is_bit_set_u8},
+    utils::{half_carry_add_u16, half_carry_add_u8, half_carry_sub_u8, is_bit_set_u8, SetBit},
 };
 
 #[derive(Debug, Clone, Default)]
@@ -134,6 +134,34 @@ impl Cpu {
                 RRCA => {
                     let a = self.registers.a();
                     let rotated = a.rotate_right(1);
+                    self.registers.set_a(rotated);
+
+                    self.registers.set_z_flg(false);
+                    self.registers.set_n_flg(false);
+                    self.registers.set_h_flg(false);
+                    self.registers.set_c_flg(is_bit_set_u8(a, 0));
+                }
+
+                // rla
+                RLA => {
+                    let a = self.registers.a();
+                    let mut rotated = a.rotate_left(1);
+
+                    rotated.set_bit(0, self.registers.c_flg());
+                    self.registers.set_a(rotated);
+
+                    self.registers.set_z_flg(false);
+                    self.registers.set_n_flg(false);
+                    self.registers.set_h_flg(false);
+                    self.registers.set_c_flg(is_bit_set_u8(a, 7));
+                }
+
+                // rra
+                RRA => {
+                    let a = self.registers.a();
+                    let mut rotated = a.rotate_right(1);
+
+                    rotated.set_bit(7, self.registers.c_flg());
                     self.registers.set_a(rotated);
 
                     self.registers.set_z_flg(false);
@@ -464,7 +492,7 @@ mod tests {
         let mut cpu = Cpu::default();
         cpu.memory.load_instructions(&[RLCA, HALT]);
 
-        cpu.registers.af = 0b10011000_00000000;
+        cpu.registers.af = 0b10011000_11100000;
 
         cpu.process_instructions()
             .expect("Unable to process CPU instructions");
@@ -478,7 +506,7 @@ mod tests {
         let mut cpu = Cpu::default();
         cpu.memory.load_instructions(&[RLCA, HALT]);
 
-        cpu.registers.af = 0b00011000_00000000;
+        cpu.registers.af = 0b00011000_11100000;
 
         cpu.process_instructions()
             .expect("Unable to process CPU instructions");
@@ -493,7 +521,7 @@ mod tests {
         let mut cpu = Cpu::default();
         cpu.memory.load_instructions(&[RRCA, HALT]);
 
-        cpu.registers.af = 0b10011000_00000000;
+        cpu.registers.af = 0b10011000_11100000;
 
         cpu.process_instructions()
             .expect("Unable to process CPU instructions");
@@ -507,12 +535,78 @@ mod tests {
         let mut cpu = Cpu::default();
         cpu.memory.load_instructions(&[RRCA, HALT]);
 
-        cpu.registers.af = 0b00011001_00000000;
+        cpu.registers.af = 0b00011001_11100000;
 
         cpu.process_instructions()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.a(), 0b10001100);
         assert_eq!(cpu.registers.c_flg(), true);
+    }
+
+    #[test]
+    fn rla() {
+        // rla
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[RLA, HALT]);
+
+        cpu.registers.af = 0b10011000_11100000;
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.a(), 0b00110000);
+        assert_eq!(cpu.registers.z_flg(), false);
+        assert_eq!(cpu.registers.n_flg(), false);
+        assert_eq!(cpu.registers.h_flg(), false);
+        assert_eq!(cpu.registers.c_flg(), true);
+
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[RLA, HALT]);
+
+        // Set carry flag here
+        cpu.registers.af = 0b00011000_11110000;
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.a(), 0b00110001);
+        assert_eq!(cpu.registers.z_flg(), false);
+        assert_eq!(cpu.registers.n_flg(), false);
+        assert_eq!(cpu.registers.h_flg(), false);
+        assert_eq!(cpu.registers.c_flg(), false);
+    }
+
+    #[test]
+    fn rra() {
+        // rra
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[RRA, HALT]);
+
+        cpu.registers.af = 0b10011001_11100000;
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.a(), 0b01001100);
+        assert_eq!(cpu.registers.z_flg(), false);
+        assert_eq!(cpu.registers.n_flg(), false);
+        assert_eq!(cpu.registers.h_flg(), false);
+        assert_eq!(cpu.registers.c_flg(), true);
+
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[RRA, HALT]);
+
+        // Set carry flag here
+        cpu.registers.af = 0b00011000_11110000;
+
+        cpu.process_instructions()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.a(), 0b10001100);
+        assert_eq!(cpu.registers.z_flg(), false);
+        assert_eq!(cpu.registers.n_flg(), false);
+        assert_eq!(cpu.registers.h_flg(), false);
+        assert_eq!(cpu.registers.c_flg(), false);
     }
 }
