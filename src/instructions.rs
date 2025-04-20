@@ -1,6 +1,6 @@
 pub const NOOP: u8 = 0b00000000;
-pub const HALT: u8 = 0b01110110;
 pub const LD_A_A: u8 = 0b01111111;
+pub const HALT: u8 = 0b01110110;
 pub const LD_IMM16_SP: u8 = 0b00001000;
 pub const INC_HL: u8 = 0b00110100;
 pub const DEC_HL: u8 = 0b00110101;
@@ -13,3 +13,5 @@ pub const DAA: u8 = 0b00100111;
 pub const CPL: u8 = 0b00101111;
 pub const SCF: u8 = 0b00110111;
 pub const CCF: u8 = 0b00111111;
+
+

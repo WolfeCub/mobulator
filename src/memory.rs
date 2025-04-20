@@ -1,3 +1,5 @@
+pub const MEM_SIZE: usize = 0xFFFF + 1;
+
 /// 0x0000 - 0x00FF: Boot ROM
 /// 0x0000 - 0x3FFF: Game ROM Bank 0
 /// 0x4000 - 0x7FFF: Game ROM Bank N
@@ -13,13 +15,13 @@
 /// 0xFFFF: Interrupt Enabled Register
 #[derive(Debug, Clone)]
 pub struct Memory {
-    pub memory: [u8; 0xFFFF],
+    pub memory: [u8; MEM_SIZE],
 }
 
 impl Default for Memory {
     fn default() -> Self {
         Self {
-            memory: [0; 0xFFFF],
+            memory: [0; MEM_SIZE],
         }
     }
 }

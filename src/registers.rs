@@ -55,6 +55,10 @@ impl Registers {
         self.af.set_bit(4, value)
     }
 
+    pub fn flags(&self) -> u8 {
+        self.af as u8
+    }
+
     pub fn b(&self) -> u8 {
         self.bc.high_u8()
     }
@@ -163,7 +167,7 @@ impl Registers {
 // │ imm16 │ The following two bytes (little-endian) │
 // └─────────────────────────────────────────────────┘
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum R8 {
     B,
     C,
@@ -191,7 +195,7 @@ impl TryFrom<u8> for R8 {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum R16 {
     BC,
     DE,
@@ -213,7 +217,7 @@ impl TryFrom<u8> for R16 {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum R16Mem {
     BC,
     DE,

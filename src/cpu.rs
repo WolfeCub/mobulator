@@ -1,11 +1,9 @@
 use anyhow::Context;
-use mobulator_macros::opcode_match;
 
 use crate::{
     instruction::Instruction,
-    instructions::*,
     memory::Memory,
-    registers::{self, Registers},
+    registers::Registers,
     utils::{half_carry_add_u16, half_carry_add_u8, half_carry_sub_u8, is_bit_set_u8, SetBit},
 };
 
@@ -15,171 +13,176 @@ pub struct Cpu {
     pub memory: Memory,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Status {
+    Cycles(u8),
+    Halt,
+}
+
 impl Cpu {
     pub fn process_instructions(&mut self) -> anyhow::Result<()> {
-        while let Some(instruction_byte) = self.next() {
-            let instruction = Instruction(instruction_byte);
-            match instruction_byte {
-                NOOP => (),
-                LD_A_A => (),
-
-                HALT => {
-                    return Ok(());
-                }
-
-                // ld r16, imm16
-                opcode_match!(00__0001) => {
-                    let data = self.imm16()?;
-                    self.registers.set_r16(instruction.p().try_into()?, data);
-                }
-
-                // ld [r16mem], a
-                opcode_match!(00__0010) => {
-                    let addr = self.registers.get_r16mem(instruction.p().try_into()?);
-                    self.memory.set_byte(addr, self.registers.a());
-                }
-
-                // ld a, [r16mem]
-                opcode_match!(00__1010) => {
-                    let addr = self.registers.get_r16mem(instruction.p().try_into()?);
-
-                    let data = self.memory.get_byte(addr)?;
-                    self.registers.set_a(data);
-                }
-
-                // ld [imm16], sp
-                LD_IMM16_SP => {
-                    let addr = self.imm16()?;
-                    let [high, low] = self.registers.sp.to_be_bytes();
-                    self.memory.set_byte(addr, low);
-                    self.memory.set_byte(addr + 1, high);
-                }
-
-                // inc r16
-                opcode_match!(00__0011) => {
-                    let register = instruction.p().try_into()?;
-                    let reg_val = self.registers.get_r16(register);
-                    let new_val = reg_val.wrapping_add(1);
-                    self.registers.set_r16(register, new_val);
-                }
-
-                // dec r16
-                opcode_match!(00__1011) => {
-                    let register = instruction.p().try_into()?;
-                    let reg_val = self.registers.get_r16(register);
-                    let new_val = reg_val.wrapping_sub(1);
-                    self.registers.set_r16(register, new_val);
-                }
-
-                // add hl, r16
-                opcode_match!(00__1001) => {
-                    let reg_val = self.registers.get_r16(instruction.p().try_into()?);
-                    let (result, overflow) = self.registers.hl.overflowing_add(reg_val);
-
-                    self.registers.set_n_flg(false);
-                    self.registers
-                        .set_h_flg(half_carry_add_u16(reg_val, self.registers.hl));
-                    self.registers.set_c_flg(overflow);
-
-                    self.registers.hl = result;
-                }
-
-                INC_HL | DEC_HL => {
-                    let addr = self.registers.hl;
-                    let byte = self.memory.get_byte(addr)?;
-
-                    let (value, carry_flag) = inc_or_dec(byte, instruction.0 == INC_HL);
-                    self.memory.set_byte(addr, value);
-
-                    self.registers.set_z_flg(value == 0);
-                    self.registers.set_n_flg(instruction.0 == DEC_HL);
-                    self.registers.set_h_flg(carry_flag);
-                }
-                // inc r8
-                // dec r8
-                opcode_match!(00___100) | opcode_match!(00___101) => {
-                    let r8 = instruction.y().try_into()?;
-                    let val = self.registers.get_r8(r8);
-
-                    let z = instruction.z();
-                    let (new_val, carry_flag) = inc_or_dec(val, z == 4);
-                    self.registers.set_r8(r8, new_val);
-
-                    self.registers.set_z_flg(new_val == 0);
-                    self.registers.set_n_flg(z == 5);
-                    self.registers.set_h_flg(carry_flag);
-                }
-
-                // ld r8, imm8
-                LD_HL_IMM8 => {
-                    let value = self.next().context("Unable to read byte after imm8")?;
-                    self.memory.set_byte(self.registers.hl, value);
-                }
-                opcode_match!(00___110) => {
-                    let value = self.next().context("Unable to read byte after imm8")?;
-                    self.registers.set_r8(instruction.y().try_into()?, value);
-                }
-
-                // rlca
-                RLCA => {
-                    let rotated = self.registers.a().rotate_left(1);
-                    self.registers.set_a(rotated);
-
-                    self.registers.set_z_flg(false);
-                    self.registers.set_n_flg(false);
-                    self.registers.set_h_flg(false);
-                    self.registers.set_c_flg(is_bit_set_u8(rotated, 0));
-                }
-
-                // rrca
-                RRCA => {
-                    let a = self.registers.a();
-                    let rotated = a.rotate_right(1);
-                    self.registers.set_a(rotated);
-
-                    self.registers.set_z_flg(false);
-                    self.registers.set_n_flg(false);
-                    self.registers.set_h_flg(false);
-                    self.registers.set_c_flg(is_bit_set_u8(a, 0));
-                }
-
-                // rla
-                RLA => {
-                    let a = self.registers.a();
-                    let mut rotated = a.rotate_left(1);
-
-                    rotated.set_bit(0, self.registers.c_flg());
-                    self.registers.set_a(rotated);
-
-                    self.registers.set_z_flg(false);
-                    self.registers.set_n_flg(false);
-                    self.registers.set_h_flg(false);
-                    self.registers.set_c_flg(is_bit_set_u8(a, 7));
-                }
-
-                // rra
-                RRA => {
-                    let a = self.registers.a();
-                    let mut rotated = a.rotate_right(1);
-
-                    rotated.set_bit(7, self.registers.c_flg());
-                    self.registers.set_a(rotated);
-
-                    self.registers.set_z_flg(false);
-                    self.registers.set_n_flg(false);
-                    self.registers.set_h_flg(false);
-                    self.registers.set_c_flg(is_bit_set_u8(a, 0));
-                }
-
-                // daa
-                DAA => {
-                }
-
-                _ => anyhow::bail!("Haven't implented instruction: {:08b}", instruction_byte,),
-            };
+        loop {
+            if Status::Halt == self.process_next_instruction()? {
+                break;
+            }
         }
-
         Ok(())
+    }
+
+    pub fn process_next_instruction(&mut self) -> anyhow::Result<Status> {
+        let Some(instruction_byte) = self.next() else {
+            return Ok(Status::Halt);
+        };
+
+        let instruction = Instruction::try_from(instruction_byte)?;
+
+        use Instruction::*;
+
+        match instruction {
+            Nop => (),
+            LdAA => (),
+
+            Halt => {
+                return Ok(Status::Halt);
+            }
+
+            LdR16Imm16 { reg } => {
+                let data = self.imm16()?;
+                self.registers.set_r16(reg, data);
+            }
+
+            LdR16memA { reg } => {
+                let addr = self.registers.get_r16mem(reg);
+                self.memory.set_byte(addr, self.registers.a());
+            }
+
+            LdAR16mem { reg } => {
+                let addr = self.registers.get_r16mem(reg);
+
+                let data = self.memory.get_byte(addr)?;
+                self.registers.set_a(data);
+            }
+
+            LdImm16Sp => {
+                let addr = self.imm16()?;
+                let [high, low] = self.registers.sp.to_be_bytes();
+                self.memory.set_byte(addr, low);
+                self.memory.set_byte(addr + 1, high);
+            }
+
+            IncR16 { reg } => {
+                let reg_val = self.registers.get_r16(reg);
+                let new_val = reg_val.wrapping_add(1);
+                self.registers.set_r16(reg, new_val);
+            }
+
+            DecR16 { reg } => {
+                let reg_val = self.registers.get_r16(reg);
+                let new_val = reg_val.wrapping_sub(1);
+                self.registers.set_r16(reg, new_val);
+            }
+
+            AddHlR16 { reg } => {
+                let reg_val = self.registers.get_r16(reg);
+                let (result, overflow) = self.registers.hl.overflowing_add(reg_val);
+
+                self.registers.set_n_flg(false);
+                self.registers
+                    .set_h_flg(half_carry_add_u16(reg_val, self.registers.hl));
+                self.registers.set_c_flg(overflow);
+
+                self.registers.hl = result;
+            }
+
+            instr@(IncHl | DecHl) => {
+                let addr = self.registers.hl;
+                let byte = self.memory.get_byte(addr)?;
+
+                let (value, carry_flag) = inc_or_dec(byte, instr == IncHl);
+                self.memory.set_byte(addr, value);
+
+                self.registers.set_z_flg(value == 0);
+                self.registers.set_n_flg(instr == DecHl);
+                self.registers.set_h_flg(carry_flag);
+            }
+            instr@(IncR8 { reg } | DecR8 { reg }) => {
+                let val = self.registers.get_r8(reg);
+
+                let is_add = matches!(instr, Instruction::IncR8 {..});
+                let (new_val, carry_flag) = inc_or_dec(val, is_add);
+                self.registers.set_r8(reg, new_val);
+
+                self.registers.set_z_flg(new_val == 0);
+                self.registers.set_n_flg(!is_add);
+                self.registers.set_h_flg(carry_flag);
+            }
+
+            LdHlImm8 => {
+                let value = self.next().context("Unable to read byte after imm8")?;
+                self.memory.set_byte(self.registers.hl, value);
+            }
+            LdR8Imm8 { reg } => {
+                let value = self.next().context("Unable to read byte after imm8")?;
+                self.registers.set_r8(reg, value);
+            }
+
+            Rlca => {
+                let rotated = self.registers.a().rotate_left(1);
+                self.registers.set_a(rotated);
+
+                self.registers.set_z_flg(false);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(is_bit_set_u8(rotated, 0));
+            }
+
+            Rrca => {
+                let a = self.registers.a();
+                let rotated = a.rotate_right(1);
+                self.registers.set_a(rotated);
+
+                self.registers.set_z_flg(false);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(is_bit_set_u8(a, 0));
+            }
+
+            Rla => {
+                let a = self.registers.a();
+                let mut rotated = a.rotate_left(1);
+
+                rotated.set_bit(0, self.registers.c_flg());
+                self.registers.set_a(rotated);
+
+                self.registers.set_z_flg(false);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(is_bit_set_u8(a, 7));
+            }
+
+            Rra => {
+                let a = self.registers.a();
+                let mut rotated = a.rotate_right(1);
+
+                rotated.set_bit(7, self.registers.c_flg());
+                self.registers.set_a(rotated);
+
+                self.registers.set_z_flg(false);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(is_bit_set_u8(a, 0));
+            }
+
+            // Daa => {}
+
+            _ => anyhow::bail!(
+                "Haven't implented instruction: {:08b} (0x{:x})",
+                instruction_byte,
+                instruction_byte
+            ),
+        };
+
+        Ok(Status::Cycles(instruction.cycles()))
     }
 
     fn imm16(&mut self) -> anyhow::Result<u16> {
@@ -208,7 +211,7 @@ impl Iterator for Cpu {
 
     fn next(&mut self) -> Option<Self::Item> {
         let byte = self.memory.get_byte(self.registers.pc);
-        self.registers.pc += 1;
+        self.registers.pc = self.registers.pc.wrapping_add(1);
         byte.ok()
     }
 }
@@ -218,9 +221,7 @@ mod tests {
     use std::u16;
 
     use crate::{
-        instruction::Instruction,
-        instructions::*,
-        registers::{R8, R16},
+        byte_instruction::ByteInstruction, instructions::*, registers::{R16, R8}
     };
     use mobulator_macros::opcode_list;
 
@@ -241,7 +242,7 @@ mod tests {
             cpu.process_instructions()
                 .expect("Unable to process CPU instructions");
 
-            let p = Instruction(instruction).p();
+            let p = ByteInstruction(instruction).p();
             let target = match R16::try_from(p).expect("Used invalid R16 register") {
                 R16::BC => cpu.registers.bc,
                 R16::DE => cpu.registers.de,
@@ -262,7 +263,7 @@ mod tests {
             let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
 
             // HL+ and HL- both access HL
-            let p = Instruction(instruction).p();
+            let p = ByteInstruction(instruction).p();
             let p = if p == 3 { 2 } else { p };
 
             cpu.registers.set_r16(p.try_into().unwrap(), addr);
@@ -283,7 +284,7 @@ mod tests {
             let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
 
             // HL+ and HL- both access HL
-            let p = Instruction(instruction).p();
+            let p = ByteInstruction(instruction).p();
             let p = if p == 3 { 2 } else { p };
 
             cpu.registers.set_r16(p.try_into().unwrap(), addr);
@@ -325,7 +326,7 @@ mod tests {
             let mut cpu = Cpu::default();
             cpu.memory.load_instructions(&[instruction, HALT]);
 
-            let instruction = Instruction(instruction);
+            let instruction = ByteInstruction(instruction);
             let reg = instruction.p().try_into().expect("Invalid r16");
             cpu.registers.set_r16(reg, 1337);
 
@@ -344,7 +345,7 @@ mod tests {
             let mut cpu = Cpu::default();
             cpu.memory.load_instructions(&[instruction, HALT]);
 
-            let instruction = Instruction(instruction);
+            let instruction = ByteInstruction(instruction);
             let reg = instruction.p().try_into().expect("Invalid r16");
             cpu.registers.set_r16(reg, 1337);
             cpu.registers.hl = 2424;
@@ -409,7 +410,7 @@ mod tests {
             cpu.memory.load_instructions(&[instruction, HALT]);
             cpu.registers.hl = 0xDC17;
 
-            let instruction = Instruction(instruction);
+            let instruction = ByteInstruction(instruction);
             // TODO: This should be nicer. Maybe split into two tests.
             let val = if instruction.y() != 6 {
                 let reg = instruction.y().try_into().expect("Invalid r8");
@@ -476,7 +477,7 @@ mod tests {
                 .load_instructions(&[instruction, 0b00111100, HALT]);
             cpu.registers.hl = 0xDC17;
 
-            let instruction = Instruction(instruction);
+            let instruction = ByteInstruction(instruction);
 
             cpu.process_instructions()
                 .expect("Unable to process CPU instructions");
