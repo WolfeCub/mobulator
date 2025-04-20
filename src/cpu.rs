@@ -16,22 +16,20 @@ pub struct Cpu {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Status {
     Cycles(u8),
-    Halt,
+    Break,
 }
 
 impl Cpu {
-    pub fn process_instructions(&mut self) -> anyhow::Result<()> {
-        loop {
-            if Status::Halt == self.process_next_instruction()? {
-                break;
-            }
+    pub fn run_num_instructions(&mut self, num: u8) -> anyhow::Result<()> {
+        for _ in 0..num {
+            self.run_next_instruction()?;
         }
         Ok(())
     }
 
-    pub fn process_next_instruction(&mut self) -> anyhow::Result<Status> {
+    pub fn run_next_instruction(&mut self) -> anyhow::Result<Status> {
         let Some(instruction_byte) = self.next() else {
-            return Ok(Status::Halt);
+            return Ok(Status::Break);
         };
 
         let instruction = Instruction::try_from(instruction_byte)?;
@@ -41,10 +39,6 @@ impl Cpu {
         match instruction {
             Nop => (),
             LdAA => (),
-
-            Halt => {
-                return Ok(Status::Halt);
-            }
 
             LdR16Imm16 { reg } => {
                 let data = self.imm16()?;
@@ -237,9 +231,8 @@ mod tests {
                 // Swapped order. Little endian
                 0b00111100,
                 0b10111100,
-                HALT,
             ]);
-            cpu.process_instructions()
+            cpu.run_next_instruction()
                 .expect("Unable to process CPU instructions");
 
             let p = ByteInstruction(instruction).p();
@@ -258,7 +251,7 @@ mod tests {
         // ld [r16mem], a
         for instruction in opcode_list!(00__0010) {
             let mut cpu = Cpu::default();
-            cpu.memory.load_instructions(&[instruction, HALT]);
+            cpu.memory.load_instructions(&[instruction]);
             cpu.registers.set_a(0b10110101);
             let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
 
@@ -267,7 +260,7 @@ mod tests {
             let p = if p == 3 { 2 } else { p };
 
             cpu.registers.set_r16(p.try_into().unwrap(), addr);
-            cpu.process_instructions()
+            cpu.run_next_instruction()
                 .expect("Unable to process CPU instructions");
 
             assert_eq!(cpu.memory.get_byte(addr).expect("Byte exists"), 0b10110101);
@@ -279,7 +272,7 @@ mod tests {
         // ld a, [r16mem]
         for instruction in opcode_list!(00__1010) {
             let mut cpu = Cpu::default();
-            cpu.memory.load_instructions(&[instruction, HALT]);
+            cpu.memory.load_instructions(&[instruction]);
 
             let addr = 0xDC17; // 0xC000 - 0xDFFF working mem
 
@@ -290,7 +283,7 @@ mod tests {
             cpu.registers.set_r16(p.try_into().unwrap(), addr);
             cpu.memory.set_byte(addr, 0x6F);
 
-            cpu.process_instructions()
+            cpu.run_next_instruction()
                 .expect("Unable to process CPU instructions");
 
             assert_eq!(cpu.registers.a(), 0x6F);
@@ -305,11 +298,11 @@ mod tests {
         let addr: u16 = 0xDC17; // 0xC000 - 0xDFFF working mem
         let [first, second] = addr.to_le_bytes();
         cpu.memory
-            .load_instructions(&[LD_IMM16_SP, first, second, HALT]);
+            .load_instructions(&[LD_IMM16_SP, first, second]);
 
         cpu.registers.sp = 0b11101011_10001001;
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         let first_mem_val = cpu.memory.get_byte(addr).expect("Byte exists");
@@ -324,13 +317,13 @@ mod tests {
         // dec r16
         for instruction in opcode_list!(00___011) {
             let mut cpu = Cpu::default();
-            cpu.memory.load_instructions(&[instruction, HALT]);
+            cpu.memory.load_instructions(&[instruction]);
 
             let instruction = ByteInstruction(instruction);
             let reg = instruction.p().try_into().expect("Invalid r16");
             cpu.registers.set_r16(reg, 1337);
 
-            cpu.process_instructions()
+            cpu.run_next_instruction()
                 .expect("Unable to process CPU instructions");
 
             let num = if instruction.q() { 1336 } else { 1338 };
@@ -343,14 +336,14 @@ mod tests {
         // add hl, r16
         for instruction in opcode_list!(00__1001) {
             let mut cpu = Cpu::default();
-            cpu.memory.load_instructions(&[instruction, HALT]);
+            cpu.memory.load_instructions(&[instruction]);
 
             let instruction = ByteInstruction(instruction);
             let reg = instruction.p().try_into().expect("Invalid r16");
             cpu.registers.set_r16(reg, 1337);
             cpu.registers.hl = 2424;
 
-            cpu.process_instructions()
+            cpu.run_next_instruction()
                 .expect("Unable to process CPU instructions");
 
             // if r16 is register HL then we double our value rather than adding from another reg
@@ -368,12 +361,12 @@ mod tests {
     #[test]
     fn add_hl_r16_flags() {
         let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[0b00001001, HALT]);
+        cpu.memory.load_instructions(&[0b00001001]);
 
         cpu.registers.bc = u16::MAX;
         cpu.registers.hl = 2;
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.hl, 1);
@@ -381,21 +374,21 @@ mod tests {
         assert_eq!(cpu.registers.h_flg(), true);
 
         let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[0b00001001, HALT]);
+        cpu.memory.load_instructions(&[0b00001001]);
         cpu.registers.bc = 62 << 8;
         cpu.registers.hl = 34 << 8;
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.h_flg(), true);
 
         let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[0b00001001, HALT]);
+        cpu.memory.load_instructions(&[0b00001001]);
         cpu.registers.bc = 1;
         cpu.registers.hl = 2;
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.h_flg(), false);
@@ -407,7 +400,7 @@ mod tests {
         // dec r8
         for instruction in [opcode_list!(00___100), opcode_list!(00___101)].concat() {
             let mut cpu = Cpu::default();
-            cpu.memory.load_instructions(&[instruction, HALT]);
+            cpu.memory.load_instructions(&[instruction]);
             cpu.registers.hl = 0xDC17;
 
             let instruction = ByteInstruction(instruction);
@@ -416,14 +409,14 @@ mod tests {
                 let reg = instruction.y().try_into().expect("Invalid r8");
                 cpu.registers.set_r8(reg, 137);
 
-                cpu.process_instructions()
+                cpu.run_next_instruction()
                     .expect("Unable to process CPU instructions");
 
                 cpu.registers.get_r8(reg)
             } else {
                 cpu.memory.set_byte(cpu.registers.hl, 137);
 
-                cpu.process_instructions()
+                cpu.run_next_instruction()
                     .expect("Unable to process CPU instructions");
 
                 cpu.memory
@@ -445,11 +438,11 @@ mod tests {
     fn inc_dec_r8_flags() {
         // inc
         let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[0b00000100, HALT]);
+        cpu.memory.load_instructions(&[0b00000100]);
 
         cpu.registers.set_r8(R8::B, 0b0000_1111);
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.h_flg(), true);
@@ -457,11 +450,11 @@ mod tests {
 
         // dec
         let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[0b00000101, HALT]);
+        cpu.memory.load_instructions(&[0b00000101]);
 
         cpu.registers.set_r8(R8::B, 0b0001_0000);
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.h_flg(), true);
@@ -474,12 +467,12 @@ mod tests {
         for instruction in opcode_list!(00___110) {
             let mut cpu = Cpu::default();
             cpu.memory
-                .load_instructions(&[instruction, 0b00111100, HALT]);
+                .load_instructions(&[instruction, 0b00111100]);
             cpu.registers.hl = 0xDC17;
 
             let instruction = ByteInstruction(instruction);
 
-            cpu.process_instructions()
+            cpu.run_next_instruction()
                 .expect("Unable to process CPU instructions");
 
             let val = if instruction.0 != LD_HL_IMM8 {
@@ -496,11 +489,11 @@ mod tests {
     fn rlca() {
         // rlca
         let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[RLCA, HALT]);
+        cpu.memory.load_instructions(&[RLCA]);
 
         cpu.registers.af = 0b10011000_11100000;
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.a(), 0b00110001);
@@ -510,11 +503,11 @@ mod tests {
         assert_eq!(cpu.registers.c_flg(), true);
 
         let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[RLCA, HALT]);
+        cpu.memory.load_instructions(&[RLCA]);
 
         cpu.registers.af = 0b00011000_11100000;
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.a(), 0b00110000);
@@ -525,11 +518,11 @@ mod tests {
     fn rrca() {
         // rrca
         let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[RRCA, HALT]);
+        cpu.memory.load_instructions(&[RRCA]);
 
         cpu.registers.af = 0b10011000_11100000;
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.a(), 0b01001100);
@@ -539,11 +532,11 @@ mod tests {
         assert_eq!(cpu.registers.c_flg(), false);
 
         let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[RRCA, HALT]);
+        cpu.memory.load_instructions(&[RRCA]);
 
         cpu.registers.af = 0b00011001_11100000;
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.a(), 0b10001100);
@@ -554,11 +547,11 @@ mod tests {
     fn rla() {
         // rla
         let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[RLA, HALT]);
+        cpu.memory.load_instructions(&[RLA]);
 
         cpu.registers.af = 0b10011000_11100000;
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.a(), 0b00110000);
@@ -568,12 +561,12 @@ mod tests {
         assert_eq!(cpu.registers.c_flg(), true);
 
         let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[RLA, HALT]);
+        cpu.memory.load_instructions(&[RLA]);
 
         // Set carry flag here
         cpu.registers.af = 0b00011000_11110000;
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.a(), 0b00110001);
@@ -587,11 +580,11 @@ mod tests {
     fn rra() {
         // rra
         let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[RRA, HALT]);
+        cpu.memory.load_instructions(&[RRA]);
 
         cpu.registers.af = 0b10011001_11100000;
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.a(), 0b01001100);
@@ -601,12 +594,12 @@ mod tests {
         assert_eq!(cpu.registers.c_flg(), true);
 
         let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[RRA, HALT]);
+        cpu.memory.load_instructions(&[RRA]);
 
         // Set carry flag here
         cpu.registers.af = 0b00011000_11110000;
 
-        cpu.process_instructions()
+        cpu.run_next_instruction()
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.a(), 0b10001100);
