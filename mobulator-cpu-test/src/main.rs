@@ -119,7 +119,7 @@ fn main() {
 
             let mut cycles = test.cycles.len();
             while cycles > 0 {
-                match cpu.process_next_instruction() {
+                match cpu.run_next_instruction() {
                     Ok(Status::Cycles(c)) => {
                         cycles -= usize::from(c);
                     },

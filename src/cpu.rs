@@ -167,7 +167,33 @@ impl Cpu {
                 self.registers.set_c_flg(is_bit_set_u8(a, 0));
             }
 
-            // Daa => {}
+            Daa => {
+                let a = self.registers.a();
+                let first_digit = a & 0b1111;
+                let subtract = self.registers.n_flg();
+
+                let mut offset = 0;
+                let mut carry = false;
+                if (!subtract && first_digit > 9) || self.registers.h_flg() {
+                    offset += 6;
+                }
+
+                if (!subtract && a > 0x99) | self.registers.c_flg() {
+                    offset += 0x60;
+                    carry = true;
+                }
+
+                let val = if subtract {
+                    a.wrapping_sub(offset)
+                } else {
+                    a.wrapping_add(offset)
+                };
+                self.registers.set_a(val);
+
+                self.registers.set_z_flg(val == 0);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(carry);
+            }
 
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
@@ -607,5 +633,39 @@ mod tests {
         assert_eq!(cpu.registers.n_flg(), false);
         assert_eq!(cpu.registers.h_flg(), false);
         assert_eq!(cpu.registers.c_flg(), false);
+    }
+
+    #[test]
+    fn daa() {
+        // daa
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[DAA]);
+
+        cpu.registers.af = 0b00000000_10100000;
+        cpu.registers.set_a(0x7c);
+
+        cpu.run_next_instruction()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.a(), 0x82);
+        assert_eq!(cpu.registers.z_flg(), false);
+        assert_eq!(cpu.registers.n_flg(), false);
+        assert_eq!(cpu.registers.h_flg(), false);
+        assert_eq!(cpu.registers.c_flg(), false);
+
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[DAA]);
+
+        cpu.registers.af = 0b00000000_10100000;
+        cpu.registers.set_a(0x9c);
+
+        cpu.run_next_instruction()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.a(), 0x02);
+        assert_eq!(cpu.registers.z_flg(), false);
+        assert_eq!(cpu.registers.n_flg(), false);
+        assert_eq!(cpu.registers.h_flg(), false);
+        assert_eq!(cpu.registers.c_flg(), true);
     }
 }
