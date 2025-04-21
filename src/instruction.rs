@@ -160,7 +160,7 @@ impl Instruction {
             Instruction::Scf => 1,
             Instruction::Ccf => 1,
             Instruction::JrImm8 => 3,
-            Instruction::JrCondImm8 { .. } => 3, // TODO: this is sometimes 2
+            Instruction::JrCondImm8 { .. } => 2,
         }
     }
 }

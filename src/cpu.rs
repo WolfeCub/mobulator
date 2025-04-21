@@ -228,9 +228,11 @@ impl Cpu {
                     Cond::C => self.registers.c_flg(),
                 };
 
+                let imm8_signed = self.imm8_signed()?;
                 if jump {
-                    let imm8_signed = self.imm8_signed()?;
                     self.registers.pc = self.registers.pc.wrapping_add_signed(i16::from(imm8_signed));
+
+                    return Ok(Status::Cycles(3));
                 }
             }
 

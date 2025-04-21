@@ -498,6 +498,8 @@ fn jr_cond_imm8() {
     for instruction in opcode_list!(001__000) {
         let mut cpu = Cpu::default();
         cpu.memory.load_instructions(&[instruction, 37]);
+        cpu.memory.memory[39] = instruction;
+        cpu.memory.memory[40] = 235;
 
         let cond = Cond::try_from(ByteInstruction(instruction).cond()).expect("Can't create Cond");
         match cond {
@@ -510,6 +512,11 @@ fn jr_cond_imm8() {
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.registers.pc, 39);
+
+        cpu.run_next_instruction()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.registers.pc, 20);
     }
 }
 
