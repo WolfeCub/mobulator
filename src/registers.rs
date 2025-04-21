@@ -239,6 +239,29 @@ impl TryFrom<u8> for R16Mem {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cond {
+    NZ,
+    Z,
+    NC,
+    C,
+}
+
+impl TryFrom<u8> for Cond {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Cond::NZ),
+            1 => Ok(Cond::Z),
+            2 => Ok(Cond::NC),
+            3 => Ok(Cond::C),
+            _ => anyhow::bail!("Unable to convert u8: '{value}' to Cond"),
+        }
+    }
+}
+
+
 // TODO: Remove repr
 #[repr(u8)]
 pub enum R16Stk {
@@ -246,15 +269,6 @@ pub enum R16Stk {
     DE = 1,
     HL = 2,
     AF = 3,
-}
-
-// TODO: Remove repr
-#[repr(u8)]
-pub enum Cond {
-    NZ = 0,
-    Z = 1,
-    NC = 2,
-    C = 3,
 }
 
 // TODO: Test more thoroughly

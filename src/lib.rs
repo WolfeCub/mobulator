@@ -5,3 +5,6 @@ pub mod memory;
 pub mod instructions;
 pub mod byte_instruction;
 pub mod instruction;
+
+#[cfg(test)]
+mod cpu_tests;

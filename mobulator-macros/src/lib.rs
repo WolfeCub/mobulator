@@ -41,7 +41,7 @@ fn generate_instructions(bin_pat: String) -> Vec<u8> {
     let width = max_i - min_i + 1;
     let max_value = 2u8.pow(width as u32);
 
-    let stripped_binary = bin_pat.replace("_", "00");
+    let stripped_binary = bin_pat.replace("_", "0");
 
     let mut instructions = Vec::with_capacity(usize::from(max_value));
     let mut permutation = u8::from_str_radix(&stripped_binary, 2).expect("Unable to parse as binary");

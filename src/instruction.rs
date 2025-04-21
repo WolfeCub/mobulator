@@ -1,7 +1,9 @@
 use mobulator_macros::opcode_match;
 
 use crate::{
-    byte_instruction::ByteInstruction, registers::{R16Mem, R16, R8}
+    byte_instruction::ByteInstruction,
+    instructions::*,
+    registers::{Cond, R8, R16, R16Mem},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -30,6 +32,8 @@ pub enum Instruction {
     Cpl,
     Scf,
     Ccf,
+    JrImm8,
+    JrCondImm8 { cond: Cond },
 }
 
 impl TryFrom<u8> for Instruction {
@@ -38,9 +42,9 @@ impl TryFrom<u8> for Instruction {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         let instruction = ByteInstruction(value);
         Ok(match value {
-            0b00000000 => Instruction::Nop,
-            0b01111111 => Instruction::LdAA,
-            0b01110110 => Instruction::Halt,
+            NOOP => Instruction::Nop,
+            LD_A_A => Instruction::LdAA,
+            HALT => Instruction::Halt,
 
             // ld r16, imm16
             opcode_match!(00__0001) => Instruction::LdR16Imm16 {
@@ -58,7 +62,7 @@ impl TryFrom<u8> for Instruction {
             },
 
             // ld [imm16], sp
-            0b00001000 => Instruction::LdImm16Sp,
+            LD_IMM16_SP => Instruction::LdImm16Sp,
 
             // inc r16
             opcode_match!(00__0011) => Instruction::IncR16 {
@@ -76,9 +80,9 @@ impl TryFrom<u8> for Instruction {
             },
 
             // inc [hl]
-            0b00110100 => Instruction::IncHl,
+            INC_HL => Instruction::IncHl,
             // dec [hl]
-            0b00110101 => Instruction::DecHl,
+            DEC_HL => Instruction::DecHl,
 
             // inc r8
             opcode_match!(00___100) => Instruction::IncR8 {
@@ -90,26 +94,34 @@ impl TryFrom<u8> for Instruction {
             },
 
             // ld [hl], imm8
-            0b00110110 => Instruction::LdHlImm8,
+            LD_HL_IMM8 => Instruction::LdHlImm8,
             // ld r8, imm8
-            opcode_match!(00___110) => {
-                Instruction::LdR8Imm8 { reg: instruction.y().try_into()? }
-            }
+            opcode_match!(00___110) => Instruction::LdR8Imm8 {
+                reg: instruction.y().try_into()?,
+            },
 
-            // rlca
-            0b00000111 => Instruction::Rlca,
+            RLCA => Instruction::Rlca,
 
-            // rrca
-            0b00001111 => Instruction::Rrca,
+            RRCA => Instruction::Rrca,
 
-            // rla
-            0b00010111 => Instruction::Rla,
+            RLA => Instruction::Rla,
 
-            // rra
-            0b00011111 => Instruction::Rra,
+            RRA => Instruction::Rra,
 
-            // daa
-            0b00100111 => Instruction::Daa,
+            DAA => Instruction::Daa,
+
+            CPL => Instruction::Cpl,
+
+            SCF => Instruction::Scf,
+
+            CCF => Instruction::Ccf,
+
+            JR_IMM8 => Instruction::JrImm8,
+
+            // jr cond, imm8
+            opcode_match!(001__000) => Instruction::JrCondImm8 {
+                cond: instruction.cond().try_into()?,
+            },
 
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
@@ -147,6 +159,8 @@ impl Instruction {
             Instruction::Cpl => 1,
             Instruction::Scf => 1,
             Instruction::Ccf => 1,
+            Instruction::JrImm8 => 3,
+            Instruction::JrCondImm8 { .. } => 3, // TODO: this is sometimes 2
         }
     }
 }

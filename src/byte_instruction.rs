@@ -36,6 +36,10 @@ impl ByteInstruction {
     pub fn q(&self) -> bool {
         is_bit_set_u8(self.0, 3)
     }
+
+    pub fn cond(&self) -> u8 {
+        (self.0 >> 3) & 0b00000011
+    }
 }
 
 #[cfg(test)]
