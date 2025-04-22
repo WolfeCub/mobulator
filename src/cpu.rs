@@ -236,15 +236,22 @@ impl Cpu {
                 }
             }
 
-            AddAR8 { reg } => {
+            AddAR8 { reg, carry } => {
                 let reg_val = self.get_r8(reg)?;
                 let a = self.registers.a();
-                let (new_val, overflow) = reg_val.overflowing_add(a);
+
+                let (mut new_val, mut overflow) = reg_val.overflowing_add(a);
+                if carry && self.registers.c_flg() {
+                    let (v, o) = new_val.overflowing_add(1);
+                    new_val = v;
+                    overflow |= o;
+                }
+
                 self.registers.set_a(new_val);
 
                 self.registers.set_z_flg(new_val == 0);
                 self.registers.set_n_flg(false);
-                self.registers.set_h_flg(half_carry_add_u8(reg_val, a));
+                self.registers.set_h_flg(half_carry_add_u8(reg_val, a, carry && self.registers.c_flg()));
                 self.registers.set_c_flg(overflow);
             }
 
@@ -308,7 +315,7 @@ impl Cpu {
 // TODO: This is maybe a little dumb but it cleans up the code above.
 fn inc_or_dec(value: u8, add: bool) -> (u8, bool) {
     if add {
-        (value.wrapping_add(1), half_carry_add_u8(value, 1))
+        (value.wrapping_add(1), half_carry_add_u8(value, 1, false))
     } else {
         (value.wrapping_sub(1), half_carry_sub_u8(value, 1))
     }

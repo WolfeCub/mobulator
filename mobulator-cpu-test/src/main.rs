@@ -53,7 +53,6 @@ fn verify(test: &Test, cpu: &Cpu) {
     let state = &test.final_state;
 
     assert_eq!(cpu.registers.a(), state.a, "Register a");
-    assert_eq!(cpu.registers.flags(), state.f, "Flags");
     assert_eq!(cpu.registers.b(), state.b, "Register b");
     assert_eq!(cpu.registers.c(), state.c, "Register c");
     assert_eq!(cpu.registers.d(), state.d, "Register d");
@@ -62,6 +61,7 @@ fn verify(test: &Test, cpu: &Cpu) {
     assert_eq!(cpu.registers.l(), state.l, "Register l");
     assert_eq!(cpu.registers.pc, state.pc, "Register pc");
     assert_eq!(cpu.registers.sp, state.sp, "Register sp");
+    assert_eq!(cpu.registers.flags(), state.f, "Flags {:08b} vs {:08b}", cpu.registers.flags(), state.f);
 
     for [addr, val] in state.ram.iter() {
         assert_eq!(
@@ -78,6 +78,9 @@ struct Args {
 
     #[arg(long)]
     file: Option<OsString>,
+
+    #[arg(long)]
+    test: Option<String>,
 
     #[arg(long, default_value_t = tracing::Level::INFO)]
     level: tracing::Level,
@@ -112,6 +115,10 @@ fn main() {
         let json = serde_json::from_str::<Vec<Test>>(&content).expect("Unable to deserialize");
 
         for test in json.into_iter() {
+            if let Some(t) = &args.test {
+                if test.name != *t { continue; }
+            }
+
             let name = test.name.clone();
             let mut cpu = setup(&test);
 

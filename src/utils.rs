@@ -15,8 +15,9 @@ pub(crate) const fn is_bit_set_u16(number: u16, bit: u32) -> bool {
     (number & calc_nth_bit_power(bit)) != 0
 }
 
-pub(crate) const fn half_carry_add_u8(a: u8, b: u8) -> bool {
-    (((a & 0xF) + (b & 0xF)) & 0x10) == 0x10
+pub(crate) const fn half_carry_add_u8(a: u8, b: u8, carry: bool) -> bool {
+    let c = if carry { 1 } else { 0 };
+    ((a & 0xF) + (b & 0xF) + c) > 0x0F
 }
 
 pub(crate) const fn half_carry_add_u16(a: u16, b: u16) -> bool {

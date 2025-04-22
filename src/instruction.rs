@@ -31,8 +31,7 @@ pub enum Instruction {
     JrImm8,
     JrCondImm8 { cond: Cond },
     LdR8R8 { src: R8, dst: R8 },
-    AddAR8 { reg: R8 },
-    AdcAR8 { reg: R8 },
+    AddAR8 { reg: R8, carry: bool },
 }
 
 impl TryFrom<u8> for Instruction {
@@ -121,10 +120,11 @@ impl TryFrom<u8> for Instruction {
             },
 
             // add a, r8
-            opcode_match!(10000___) => Instruction::AddAR8 { reg: instruction.z().try_into()? },
-
             // adc a, r8
-            opcode_match!(10001___) => Instruction::AdcAR8 { reg: instruction.z().try_into()? },
+            opcode_match!(1000____) => Instruction::AddAR8 {
+                reg: instruction.z().try_into()?,
+                carry: instruction.q(),
+            },
 
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
@@ -166,10 +166,8 @@ impl Instruction {
             Instruction::LdR8R8 { src: R8::HL, .. } => 2,
             Instruction::LdR8R8 { dst: R8::HL, .. } => 2,
             Instruction::LdR8R8 { .. } => 1,
-            Instruction::AddAR8 { reg: R8::HL } => 2,
+            Instruction::AddAR8 { reg: R8::HL, .. } => 2,
             Instruction::AddAR8 { .. } => 1,
-            Instruction::AdcAR8 { reg: R8::HL } => 2,
-            Instruction::AdcAR8 { .. } => 1,
         }
     }
 }

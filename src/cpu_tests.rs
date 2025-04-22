@@ -1,7 +1,10 @@
 use std::u16;
 
 use crate::{
-    byte_instruction::ByteInstruction, cpu::Cpu, instruction::Instruction, instructions::*, registers::{Cond, R16, R8}
+    byte_instruction::ByteInstruction,
+    cpu::Cpu,
+    instructions::*,
+    registers::{Cond, R8, R16},
 };
 use mobulator_macros::opcode_list;
 
@@ -521,7 +524,9 @@ fn jr_cond_imm8() {
 fn ld_r8_r8() {
     // ld r8, r8
     for instruction in opcode_list!(01______) {
-        if instruction == HALT { continue; }
+        if instruction == HALT {
+            continue;
+        }
 
         let mut cpu = Cpu::default();
         cpu.memory.load_instructions(&[instruction]);
@@ -544,24 +549,26 @@ fn ld_r8_r8() {
 #[test]
 fn add_a_r8() {
     // add a, r8
-    for instruction in opcode_list!(10000___) {
-        let mut cpu = Cpu::default();
-        cpu.memory.load_instructions(&[instruction]);
-        cpu.registers.hl = 50; // Out of the way of instructions
+    for set_carry in [true, false] {
+        for instruction in opcode_list!(1000____) {
+            let mut cpu = Cpu::default();
+            cpu.memory.load_instructions(&[instruction]);
+            cpu.registers.hl = 50; // Out of the way of instructions
 
-        let reg: R8 = ByteInstruction(instruction).z().try_into().unwrap();
+            let byte = ByteInstruction(instruction);
+            let reg = byte.z().try_into().unwrap();
 
-        cpu.registers.set_a(73);
-        cpu.set_r8(reg, 37);
+            cpu.registers.set_a(73);
+            cpu.set_r8(reg, 37);
+            cpu.registers.set_c_flg(set_carry);
 
-        cpu.run_next_instruction()
-            .expect("Unable to process CPU instructions");
 
-        let target = if reg == R8::A {
-            74
-        } else {
-            110
-        };
-        assert_eq!(cpu.registers.a(), target);
+            cpu.run_next_instruction()
+                .expect("Unable to process CPU instructions");
+
+            let target = if reg == R8::A { 74 } else { 110 };
+            let carry = if byte.q() && set_carry { 1 } else { 0 };
+            assert_eq!(cpu.registers.a(), target + carry);
+        }
     }
 }
