@@ -255,6 +255,64 @@ impl Cpu {
                 self.registers.set_c_flg(overflow);
             }
 
+            SubAR8 { reg, carry } => {
+                let reg_val = self.get_r8(reg)?;
+                let a = self.registers.a();
+
+                let (mut new_val, mut overflow) = a.overflowing_sub(reg_val);
+                if carry && self.registers.c_flg() {
+                    let (v, o) = new_val.overflowing_sub(1);
+                    new_val = v;
+                    overflow |= o;
+                }
+
+                self.registers.set_a(new_val);
+
+                self.registers.set_z_flg(new_val == 0);
+                self.registers.set_n_flg(true);
+                self.registers.set_h_flg(half_carry_sub_u8(a, reg_val, carry && self.registers.c_flg()));
+                self.registers.set_c_flg(overflow);
+            }
+
+            AndAR8 { reg } => {
+                let reg_val = self.get_r8(reg)?;
+                let a = self.registers.a();
+                let new_val = reg_val & a;
+
+                self.registers.set_a(new_val);
+
+                self.registers.set_z_flg(new_val == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(true);
+                self.registers.set_c_flg(false);
+            }
+
+            XorAR8 { reg } => {
+                let reg_val = self.get_r8(reg)?;
+                let a = self.registers.a();
+                let new_val = reg_val ^ a;
+
+                self.registers.set_a(new_val);
+
+                self.registers.set_z_flg(new_val == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(false);
+            }
+
+            OrAR8 { reg } => {
+                let reg_val = self.get_r8(reg)?;
+                let a = self.registers.a();
+                let new_val = reg_val | a;
+
+                self.registers.set_a(new_val);
+
+                self.registers.set_z_flg(new_val == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(false);
+            }
+
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
                 instruction_byte,
@@ -317,7 +375,7 @@ fn inc_or_dec(value: u8, add: bool) -> (u8, bool) {
     if add {
         (value.wrapping_add(1), half_carry_add_u8(value, 1, false))
     } else {
-        (value.wrapping_sub(1), half_carry_sub_u8(value, 1))
+        (value.wrapping_sub(1), half_carry_sub_u8(value, 1, false))
     }
 }
 

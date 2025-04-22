@@ -572,3 +572,95 @@ fn add_a_r8() {
         }
     }
 }
+
+#[test]
+fn sub_a_r8() {
+    // sub a, r8
+    for set_carry in [true, false] {
+        for instruction in opcode_list!(1001____) {
+            let mut cpu = Cpu::default();
+            cpu.memory.load_instructions(&[instruction]);
+            cpu.registers.hl = 50; // Out of the way of instructions
+
+            let byte = ByteInstruction(instruction);
+            let reg = byte.z().try_into().unwrap();
+
+            cpu.registers.set_a(100);
+            cpu.set_r8(reg, 22);
+            cpu.registers.set_c_flg(set_carry);
+
+            cpu.run_next_instruction()
+                .expect("Unable to process CPU instructions");
+
+            let target: u8 = if reg == R8::A { 0 } else { 78 };
+            let carry: u8 = if byte.q() && set_carry { 1 } else { 0 };
+            assert_eq!(cpu.registers.a(), target.wrapping_sub(carry));
+        }
+    }
+}
+
+#[test]
+fn and_a_r8() {
+    // and a, r8
+    for instruction in opcode_list!(10100___) {
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[instruction]);
+        cpu.registers.hl = 50; // Out of the way of instructions
+
+        let byte = ByteInstruction(instruction);
+        let reg = byte.z().try_into().unwrap();
+
+        cpu.registers.set_a(100);
+        cpu.set_r8(reg, 22);
+
+        cpu.run_next_instruction()
+            .expect("Unable to process CPU instructions");
+
+        let target: u8 = if reg == R8::A { 22 } else { 4 };
+        assert_eq!(cpu.registers.a(), target);
+    }
+}
+
+#[test]
+fn xor_a_r8() {
+    // xor a, r8
+    for instruction in opcode_list!(10101___) {
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[instruction]);
+        cpu.registers.hl = 50; // Out of the way of instructions
+
+        let byte = ByteInstruction(instruction);
+        let reg = byte.z().try_into().unwrap();
+
+        cpu.registers.set_a(100);
+        cpu.set_r8(reg, 22);
+
+        cpu.run_next_instruction()
+            .expect("Unable to process CPU instructions");
+
+        let target: u8 = if reg == R8::A { 0 } else { 114 };
+        assert_eq!(cpu.registers.a(), target);
+    }
+}
+
+#[test]
+fn or_a_r8() {
+    // or a, r8
+    for instruction in opcode_list!(10110___) {
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[instruction]);
+        cpu.registers.hl = 50; // Out of the way of instructions
+
+        let byte = ByteInstruction(instruction);
+        let reg = byte.z().try_into().unwrap();
+
+        cpu.registers.set_a(100);
+        cpu.set_r8(reg, 22);
+
+        cpu.run_next_instruction()
+            .expect("Unable to process CPU instructions");
+
+        let target: u8 = if reg == R8::A { 22 } else { 118 };
+        assert_eq!(cpu.registers.a(), target);
+    }
+}
