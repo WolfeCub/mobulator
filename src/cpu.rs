@@ -3,8 +3,11 @@ use anyhow::Context;
 use crate::{
     instruction::Instruction,
     memory::Memory,
-    registers::{Cond, Registers, R8},
-    utils::{half_carry_add_u16, half_carry_add_u8, half_carry_sub_u8, is_bit_set_u8, RegisterU16Ext, SetBit},
+    registers::{Cond, R8, Registers},
+    utils::{
+        RegisterU16Ext, SetBit, half_carry_add_u8, half_carry_add_u16, half_carry_sub_u8,
+        is_bit_set_u8,
+    },
 };
 
 #[derive(Debug, Clone, Default)]
@@ -87,10 +90,10 @@ impl Cpu {
                 self.registers.hl = result;
             }
 
-            instr@(IncR8 { reg } | DecR8 { reg }) => {
+            instr @ (IncR8 { reg } | DecR8 { reg }) => {
                 let val = self.get_r8(reg)?;
 
-                let is_add = matches!(instr, Instruction::IncR8 {..});
+                let is_add = matches!(instr, Instruction::IncR8 { .. });
                 let (new_val, carry_flag) = inc_or_dec(val, is_add);
                 self.set_r8(reg, new_val);
 
@@ -201,7 +204,10 @@ impl Cpu {
 
             JrImm8 => {
                 let imm8_signed = self.imm8_signed()?;
-                self.registers.pc = self.registers.pc.wrapping_add_signed(i16::from(imm8_signed));
+                self.registers.pc = self
+                    .registers
+                    .pc
+                    .wrapping_add_signed(i16::from(imm8_signed));
             }
 
             JrCondImm8 { cond } => {
@@ -214,7 +220,10 @@ impl Cpu {
 
                 let imm8_signed = self.imm8_signed()?;
                 if jump {
-                    self.registers.pc = self.registers.pc.wrapping_add_signed(i16::from(imm8_signed));
+                    self.registers.pc = self
+                        .registers
+                        .pc
+                        .wrapping_add_signed(i16::from(imm8_signed));
 
                     return Ok(Status::Cycles(3));
                 }
@@ -225,6 +234,18 @@ impl Cpu {
                 if src != dst {
                     self.set_r8(dst, self.get_r8(src)?);
                 }
+            }
+
+            AddAR8 { reg } => {
+                let reg_val = self.get_r8(reg)?;
+                let a = self.registers.a();
+                let (new_val, overflow) = reg_val.overflowing_add(a);
+                self.registers.set_a(new_val);
+
+                self.registers.set_z_flg(new_val == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(half_carry_add_u8(reg_val, a));
+                self.registers.set_c_flg(overflow);
             }
 
             _ => anyhow::bail!(
@@ -266,9 +287,7 @@ impl Cpu {
             R8::H => self.registers.h(),
             R8::L => self.registers.l(),
             R8::A => self.registers.a(),
-            R8::HL => {
-                self.memory.get_byte(self.registers.hl)?
-            }
+            R8::HL => self.memory.get_byte(self.registers.hl)?,
         })
     }
 
@@ -281,9 +300,7 @@ impl Cpu {
             R8::H => self.registers.hl.set_high(value),
             R8::L => self.registers.hl.set_low(value),
             R8::A => self.registers.af.set_high(value),
-            R8::HL => {
-                self.memory.set_byte(self.registers.hl, value)
-            }
+            R8::HL => self.memory.set_byte(self.registers.hl, value),
         };
     }
 }
@@ -306,4 +323,3 @@ impl Iterator for Cpu {
         byte.ok()
     }
 }
-

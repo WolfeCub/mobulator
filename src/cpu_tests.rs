@@ -1,10 +1,7 @@
 use std::u16;
 
 use crate::{
-    byte_instruction::ByteInstruction,
-    cpu::Cpu,
-    instructions::*,
-    registers::{Cond, R8, R16},
+    byte_instruction::ByteInstruction, cpu::Cpu, instruction::Instruction, instructions::*, registers::{Cond, R16, R8}
 };
 use mobulator_macros::opcode_list;
 
@@ -541,5 +538,30 @@ fn ld_r8_r8() {
             .expect("Unable to process CPU instructions");
 
         assert_eq!(cpu.get_r8(dst).unwrap(), 37);
+    }
+}
+
+#[test]
+fn add_a_r8() {
+    // add a, r8
+    for instruction in opcode_list!(10000___) {
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[instruction]);
+        cpu.registers.hl = 50; // Out of the way of instructions
+
+        let reg: R8 = ByteInstruction(instruction).z().try_into().unwrap();
+
+        cpu.registers.set_a(73);
+        cpu.set_r8(reg, 37);
+
+        cpu.run_next_instruction()
+            .expect("Unable to process CPU instructions");
+
+        let target = if reg == R8::A {
+            74
+        } else {
+            110
+        };
+        assert_eq!(cpu.registers.a(), target);
     }
 }
