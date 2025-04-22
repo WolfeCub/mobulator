@@ -17,18 +17,14 @@ pub(crate) const fn is_bit_set_u16(number: u16, bit: u32) -> bool {
 
 pub(crate) const fn half_carry_add_u8(a: u8, b: u8, carry: bool) -> bool {
     let c = if carry { 1 } else { 0 };
-    ((a & 0xF) + (b & 0xF) + c) > 0x0F
+    ((a & 0x0F) + (b & 0x0F) + c) > 0x0F
 }
 
 pub(crate) const fn half_carry_add_u16(a: u16, b: u16) -> bool {
-    (((a & 0xFFF) + (b & 0xFFF)) & 0x1000) == 0x1000
+    ((a & 0x0FFF) + (b & 0x0FFF)) > 0x0FFF
 }
 
 pub(crate) const fn half_carry_sub_u8(a: u8, b: u8) -> bool {
-    a & 0x0F < b & 0x0F
-}
-
-pub(crate) const fn half_carry_sub_u16(a: u16, b: u16) -> bool {
     a & 0x0F < b & 0x0F
 }
 
