@@ -3,8 +3,8 @@ use anyhow::Context;
 use crate::{
     instruction::Instruction,
     memory::Memory,
-    registers::{Cond, Registers, R16},
-    utils::{half_carry_add_u16, half_carry_add_u8, half_carry_sub_u8, is_bit_set_u8, SetBit},
+    registers::{Cond, Registers, R8},
+    utils::{half_carry_add_u16, half_carry_add_u8, half_carry_sub_u8, is_bit_set_u8, RegisterU16Ext, SetBit},
 };
 
 #[derive(Debug, Clone, Default)]
@@ -38,7 +38,6 @@ impl Cpu {
 
         match instruction {
             Nop => (),
-            LdAA => (),
 
             LdR16Imm16 { reg } => {
                 let data = self.imm16()?;
@@ -88,36 +87,21 @@ impl Cpu {
                 self.registers.hl = result;
             }
 
-            instr@(IncHl | DecHl) => {
-                let addr = self.registers.hl;
-                let byte = self.memory.get_byte(addr)?;
-
-                let (value, carry_flag) = inc_or_dec(byte, instr == IncHl);
-                self.memory.set_byte(addr, value);
-
-                self.registers.set_z_flg(value == 0);
-                self.registers.set_n_flg(instr == DecHl);
-                self.registers.set_h_flg(carry_flag);
-            }
             instr@(IncR8 { reg } | DecR8 { reg }) => {
-                let val = self.registers.get_r8(reg);
+                let val = self.get_r8(reg)?;
 
                 let is_add = matches!(instr, Instruction::IncR8 {..});
                 let (new_val, carry_flag) = inc_or_dec(val, is_add);
-                self.registers.set_r8(reg, new_val);
+                self.set_r8(reg, new_val);
 
                 self.registers.set_z_flg(new_val == 0);
                 self.registers.set_n_flg(!is_add);
                 self.registers.set_h_flg(carry_flag);
             }
 
-            LdHlImm8 => {
-                let value = self.imm8()?;
-                self.memory.set_byte(self.registers.hl, value);
-            }
             LdR8Imm8 { reg } => {
                 let value = self.imm8()?;
-                self.registers.set_r8(reg, value);
+                self.set_r8(reg, value);
             }
 
             Rlca => {
@@ -236,6 +220,13 @@ impl Cpu {
                 }
             }
 
+            LdR8R8 { src, dst } => {
+                // TODO: Maybe move into `Instruction` or two match arms
+                if src != dst {
+                    self.set_r8(dst, self.get_r8(src)?);
+                }
+            }
+
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
                 instruction_byte,
@@ -263,6 +254,37 @@ impl Cpu {
 
     fn imm8_signed(&mut self) -> anyhow::Result<i8> {
         Ok(self.imm8()? as i8)
+    }
+
+    // TODO: Test these
+    pub fn get_r8(&self, r8: R8) -> anyhow::Result<u8> {
+        Ok(match r8 {
+            R8::B => self.registers.b(),
+            R8::C => self.registers.c(),
+            R8::D => self.registers.d(),
+            R8::E => self.registers.e(),
+            R8::H => self.registers.h(),
+            R8::L => self.registers.l(),
+            R8::A => self.registers.a(),
+            R8::HL => {
+                self.memory.get_byte(self.registers.hl)?
+            }
+        })
+    }
+
+    pub fn set_r8(&mut self, r8: R8, value: u8) {
+        match r8 {
+            R8::B => self.registers.bc.set_high(value),
+            R8::C => self.registers.bc.set_low(value),
+            R8::D => self.registers.de.set_high(value),
+            R8::E => self.registers.de.set_low(value),
+            R8::H => self.registers.hl.set_high(value),
+            R8::L => self.registers.hl.set_low(value),
+            R8::A => self.registers.af.set_high(value),
+            R8::HL => {
+                self.memory.set_byte(self.registers.hl, value)
+            }
+        };
     }
 }
 

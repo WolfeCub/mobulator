@@ -4,7 +4,7 @@ use crate::{
     byte_instruction::ByteInstruction,
     cpu::Cpu,
     instructions::*,
-    registers::{Cond, R16, R8},
+    registers::{Cond, R8, R16},
 };
 use mobulator_macros::opcode_list;
 
@@ -193,12 +193,12 @@ fn inc_dec_r8() {
         // TODO: This should be nicer. Maybe split into two tests.
         let val = if instruction.y() != 6 {
             let reg = instruction.y().try_into().expect("Invalid r8");
-            cpu.registers.set_r8(reg, 137);
+            cpu.set_r8(reg, 137);
 
             cpu.run_next_instruction()
                 .expect("Unable to process CPU instructions");
 
-            cpu.registers.get_r8(reg)
+            cpu.get_r8(reg).unwrap()
         } else {
             cpu.memory.set_byte(cpu.registers.hl, 137);
 
@@ -226,7 +226,7 @@ fn inc_dec_r8_flags() {
     let mut cpu = Cpu::default();
     cpu.memory.load_instructions(&[0b00000100]);
 
-    cpu.registers.set_r8(R8::B, 0b0000_1111);
+    cpu.set_r8(R8::B, 0b0000_1111);
 
     cpu.run_next_instruction()
         .expect("Unable to process CPU instructions");
@@ -238,7 +238,7 @@ fn inc_dec_r8_flags() {
     let mut cpu = Cpu::default();
     cpu.memory.load_instructions(&[0b00000101]);
 
-    cpu.registers.set_r8(R8::B, 0b0001_0000);
+    cpu.set_r8(R8::B, 0b0001_0000);
 
     cpu.run_next_instruction()
         .expect("Unable to process CPU instructions");
@@ -261,7 +261,7 @@ fn ld_r8_imm8() {
             .expect("Unable to process CPU instructions");
 
         let val = if instruction.0 != LD_HL_IMM8 {
-            cpu.registers.get_r8(instruction.y().try_into().unwrap())
+            cpu.get_r8(instruction.y().try_into().unwrap()).unwrap()
         } else {
             cpu.memory.get_byte(cpu.registers.hl).unwrap()
         };
@@ -505,7 +505,7 @@ fn jr_cond_imm8() {
         match cond {
             Cond::Z => cpu.registers.set_z_flg(true),
             Cond::C => cpu.registers.set_c_flg(true),
-            _ => {},
+            _ => {}
         }
 
         cpu.run_next_instruction()
@@ -520,3 +520,26 @@ fn jr_cond_imm8() {
     }
 }
 
+#[test]
+fn ld_r8_r8() {
+    // ld r8, r8
+    for instruction in opcode_list!(01______) {
+        if instruction == HALT { continue; }
+
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[instruction]);
+        cpu.registers.hl = 50; // Out of the way of instructions
+
+        let byte = ByteInstruction(instruction);
+        let src: R8 = byte.z().try_into().unwrap();
+        let dst: R8 = byte.y().try_into().unwrap();
+
+        cpu.set_r8(dst, 22);
+        cpu.set_r8(src, 37);
+
+        cpu.run_next_instruction()
+            .expect("Unable to process CPU instructions");
+
+        assert_eq!(cpu.get_r8(dst).unwrap(), 37);
+    }
+}

@@ -127,29 +127,6 @@ impl Registers {
         }
     }
 
-    pub fn get_r8(&self, r8: R8) -> u8 {
-        match r8 {
-            R8::B => self.b(),
-            R8::C => self.c(),
-            R8::D => self.d(),
-            R8::E => self.e(),
-            R8::H => self.h(),
-            R8::L => self.l(),
-            R8::A => self.a(),
-        }
-    }
-
-    pub fn set_r8(&mut self, r8: R8, value: u8) {
-        match r8 {
-            R8::B => self.bc.set_high(value),
-            R8::C => self.bc.set_low(value),
-            R8::D => self.de.set_high(value),
-            R8::E => self.de.set_low(value),
-            R8::H => self.hl.set_high(value),
-            R8::L => self.hl.set_low(value),
-            R8::A => self.af.set_high(value),
-        };
-    }
 }
 
 // ┌───────┬────┬────┬────┬────┬────┬────┬──────┬────┐
@@ -175,6 +152,7 @@ pub enum R8 {
     E,
     H,
     L,
+    HL,
     A,
 }
 
@@ -189,6 +167,7 @@ impl TryFrom<u8> for R8 {
             3 => Ok(R8::E),
             4 => Ok(R8::H),
             5 => Ok(R8::L),
+            6 => Ok(R8::HL),
             7 => Ok(R8::A),
             _ => anyhow::bail!("Unable to convert u8: '{value}' to R8"),
         }
@@ -274,13 +253,13 @@ pub enum R16Stk {
 // TODO: Test more thoroughly
 #[cfg(test)]
 mod tests {
-    use crate::registers::{R16Mem, R8};
+    use crate::registers::R16Mem;
 
     use super::Registers;
 
     #[test]
     fn b_registers() {
-        let mut r = Registers {
+        let r = Registers {
             af: 0b00000101_00001010,
             bc: 0b00000101_00001010,
             de: 0b00000101_00001010,
@@ -298,12 +277,6 @@ mod tests {
 
         assert_eq!(r.h(), 0b00000101);
         assert_eq!(r.l(), 0b00001010);
-
-        r.set_r8(R8::C, 0b10111100);
-        assert_eq!(r.bc, 0b00000101_10111100);
-
-        r.set_r8(R8::D, 0b10111100);
-        assert_eq!(r.de, 0b10111100_00001010);
     }
 
     #[test]

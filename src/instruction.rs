@@ -9,7 +9,6 @@ use crate::{
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Instruction {
     Nop,
-    LdAA,
     Halt,
     LdR16Imm16 { reg: R16 },
     LdR16memA { reg: R16Mem },
@@ -19,11 +18,8 @@ pub enum Instruction {
     DecR16 { reg: R16 },
     AddHlR16 { reg: R16 },
     IncR8 { reg: R8 },
-    IncHl,
     DecR8 { reg: R8 },
-    DecHl,
     LdR8Imm8 { reg: R8 },
-    LdHlImm8,
     Rlca,
     Rrca,
     Rla,
@@ -34,6 +30,7 @@ pub enum Instruction {
     Ccf,
     JrImm8,
     JrCondImm8 { cond: Cond },
+    LdR8R8 { src: R8, dst: R8 },
 }
 
 impl TryFrom<u8> for Instruction {
@@ -43,7 +40,6 @@ impl TryFrom<u8> for Instruction {
         let instruction = ByteInstruction(value);
         Ok(match value {
             NOOP => Instruction::Nop,
-            LD_A_A => Instruction::LdAA,
             HALT => Instruction::Halt,
 
             // ld r16, imm16
@@ -79,11 +75,6 @@ impl TryFrom<u8> for Instruction {
                 reg: instruction.p().try_into()?,
             },
 
-            // inc [hl]
-            INC_HL => Instruction::IncHl,
-            // dec [hl]
-            DEC_HL => Instruction::DecHl,
-
             // inc r8
             opcode_match!(00___100) => Instruction::IncR8 {
                 reg: instruction.y().try_into()?,
@@ -93,8 +84,6 @@ impl TryFrom<u8> for Instruction {
                 reg: instruction.y().try_into()?,
             },
 
-            // ld [hl], imm8
-            LD_HL_IMM8 => Instruction::LdHlImm8,
             // ld r8, imm8
             opcode_match!(00___110) => Instruction::LdR8Imm8 {
                 reg: instruction.y().try_into()?,
@@ -123,6 +112,12 @@ impl TryFrom<u8> for Instruction {
                 cond: instruction.cond().try_into()?,
             },
 
+            opcode_match!(01______) => Instruction::LdR8R8 {
+                src: instruction.z().try_into()?,
+                dst: instruction.y().try_into()?,
+            },
+
+
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
                 value,
@@ -136,7 +131,6 @@ impl Instruction {
     pub fn cycles(&self) -> u8 {
         match self {
             Instruction::Nop => 1,
-            Instruction::LdAA => 1,
             Instruction::Halt => 1,
             Instruction::LdR16Imm16 { .. } => 3,
             Instruction::LdR16memA { .. } => 2,
@@ -145,12 +139,12 @@ impl Instruction {
             Instruction::IncR16 { .. } => 2,
             Instruction::DecR16 { .. } => 2,
             Instruction::AddHlR16 { .. } => 2,
+            Instruction::IncR8 { reg: R8::HL } => 3,
+            Instruction::DecR8 { reg: R8::HL } => 3,
             Instruction::IncR8 { .. } => 1,
-            Instruction::IncHl => 3,
             Instruction::DecR8 { .. } => 1,
-            Instruction::DecHl => 3,
+            Instruction::LdR8Imm8 { reg: R8::HL } => 3,
             Instruction::LdR8Imm8 { .. } => 2,
-            Instruction::LdHlImm8 => 3,
             Instruction::Rlca => 1,
             Instruction::Rrca => 1,
             Instruction::Rla => 1,
@@ -161,6 +155,9 @@ impl Instruction {
             Instruction::Ccf => 1,
             Instruction::JrImm8 => 3,
             Instruction::JrCondImm8 { .. } => 2,
+            Instruction::LdR8R8 { src: R8::HL, .. } => 2,
+            Instruction::LdR8R8 { dst: R8::HL, .. } => 2,
+            Instruction::LdR8R8 { .. } => 1
         }
     }
 }
