@@ -36,6 +36,7 @@ pub enum Instruction {
     AndAR8 { reg: R8 },
     XorAR8 { reg: R8 },
     OrAR8 { reg: R8 },
+    CpAR8 { reg: R8 },
 }
 
 impl TryFrom<u8> for Instruction {
@@ -152,6 +153,11 @@ impl TryFrom<u8> for Instruction {
                 reg: instruction.z().try_into()?,
             },
 
+            // cp a, r8
+            opcode_match!(10111___) => Instruction::CpAR8 {
+                reg: instruction.z().try_into()?,
+            },
+
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
                 value,
@@ -202,6 +208,8 @@ impl Instruction {
             Instruction::XorAR8 { .. } => 1,
             Instruction::OrAR8 { reg: R8::HL } => 2,
             Instruction::OrAR8 { .. } => 1,
+            Instruction::CpAR8 { reg: R8::HL } => 2,
+            Instruction::CpAR8 { .. } => 1,
         }
     }
 }

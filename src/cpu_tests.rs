@@ -664,3 +664,25 @@ fn or_a_r8() {
         assert_eq!(cpu.registers.a(), target);
     }
 }
+
+#[test]
+fn cp_a_r8() {
+    // cp a, r8
+    for instruction in opcode_list!(10111___) {
+        let mut cpu = Cpu::default();
+        cpu.memory.load_instructions(&[instruction]);
+        cpu.registers.hl = 50; // Out of the way of instructions
+
+        let byte = ByteInstruction(instruction);
+        let reg = byte.z().try_into().unwrap();
+
+        cpu.registers.set_a(22);
+        cpu.set_r8(reg, 100);
+
+        cpu.run_next_instruction()
+            .expect("Unable to process CPU instructions");
+
+        let target: u8 = if reg == R8::A { 100 } else { 22 };
+        assert_eq!(cpu.registers.a(), target);
+    }
+}

@@ -313,6 +313,18 @@ impl Cpu {
                 self.registers.set_c_flg(false);
             }
 
+            CpAR8 { reg } => {
+                let reg_val = self.get_r8(reg)?;
+                let a = self.registers.a();
+
+                let (_, overflow) = a.overflowing_sub(reg_val);
+
+                self.registers.set_z_flg(reg_val == a);
+                self.registers.set_n_flg(true);
+                self.registers.set_h_flg(half_carry_sub_u8(a, reg_val, false));
+                self.registers.set_c_flg(overflow);
+            }
+
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
                 instruction_byte,
