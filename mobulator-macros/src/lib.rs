@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, Lit};
-use quote::quote;
+use syn::{parse_macro_input, punctuated::Punctuated, Lit};
+use quote::{format_ident, quote};
 
 #[proc_macro]
 pub fn opcode_match(tokens: TokenStream) -> TokenStream {
