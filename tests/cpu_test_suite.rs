@@ -108,3 +108,16 @@ gen_test!(0x00, 0x0F);
 gen_test!(0x11, 0x75);
 // 0x76 HALT
 gen_test!(0x77, 0xBF);
+
+// TODO: Merge these single instructions when gaps are implemented
+
+// ret cond
+// ret
+// ret i
+gen_test!(0xC0);
+gen_test!(0xD0);
+gen_test!(0xC8, 0xC9);
+gen_test!(0xD8, 0xD9);
+
+// jp cond, imm16
+gen_test!(0xC2);

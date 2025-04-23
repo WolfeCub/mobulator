@@ -37,6 +37,10 @@ pub enum Instruction {
     XorAR8 { reg: R8 },
     OrAR8 { reg: R8 },
     CpAR8 { reg: R8 },
+    RetCond { cond: Cond },
+    Ret,
+    Reti,
+    JpCondImm16 { cond: Cond },
 }
 
 impl TryFrom<u8> for Instruction {
@@ -158,6 +162,18 @@ impl TryFrom<u8> for Instruction {
                 reg: instruction.z().try_into()?,
             },
 
+            // ret cond
+            opcode_match!(110__000) => Instruction::RetCond { cond: instruction.cond().try_into()? },
+
+            // ret
+            RET => Instruction::Ret,
+
+            // reti
+            RETI => Instruction::Reti,
+
+            // jp cond, imm16
+            opcode_match!(110__010) => Instruction::JpCondImm16 { cond: instruction.cond().try_into()? },
+
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
                 value,
@@ -210,6 +226,10 @@ impl Instruction {
             Instruction::OrAR8 { .. } => 1,
             Instruction::CpAR8 { reg: R8::HL } => 2,
             Instruction::CpAR8 { .. } => 1,
+            Instruction::RetCond { .. } => 2,
+            Instruction::Ret => 4,
+            Instruction::Reti => 4,
+            Instruction::JpCondImm16 { .. } => 3,
         }
     }
 }

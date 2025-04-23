@@ -211,15 +211,8 @@ impl Cpu {
             }
 
             JrCondImm8 { cond } => {
-                let jump = match cond {
-                    Cond::NZ => !self.registers.z_flg(),
-                    Cond::Z => self.registers.z_flg(),
-                    Cond::NC => !self.registers.c_flg(),
-                    Cond::C => self.registers.c_flg(),
-                };
-
                 let imm8_signed = self.imm8_signed()?;
-                if jump {
+                if self.cond_met(cond) {
                     self.registers.pc = self
                         .registers
                         .pc
@@ -334,6 +327,32 @@ impl Cpu {
                 self.registers.set_c_flg(overflow);
             }
 
+            RetCond { cond } => {
+                if self.cond_met(cond) {
+                    self.ret()?;
+                    return Ok(Status::Cycles(5));
+                }
+
+            }
+
+            Ret => {
+                self.ret()?;
+            }
+
+            Reti => {
+                // TODO: There's some interrupt stuff to do here
+                self.ret()?;
+            }
+
+            JpCondImm16 { cond } => {
+                let imm16 = self.imm16()?;
+
+                if self.cond_met(cond) {
+                    self.registers.pc = imm16;
+                }
+
+            }
+
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
                 instruction_byte,
@@ -342,6 +361,23 @@ impl Cpu {
         };
 
         Ok(Status::Cycles(instruction.cycles()))
+    }
+
+    fn cond_met(&mut self, cond: Cond) -> bool {
+        match cond {
+            Cond::NZ => !self.registers.z_flg(),
+            Cond::Z => self.registers.z_flg(),
+            Cond::NC => !self.registers.c_flg(),
+            Cond::C => self.registers.c_flg(),
+        }
+    }
+
+    fn ret(&mut self) -> Result<(), anyhow::Error> {
+        let low = self.memory.get_byte(self.registers.sp)?;
+        let high = self.memory.get_byte(self.registers.sp.wrapping_add(1))?;
+        self.registers.sp = self.registers.sp.wrapping_add(2);
+        self.registers.pc = u16::from_be_bytes([high, low]);
+        Ok(())
     }
 
     fn imm16(&mut self) -> anyhow::Result<u16> {

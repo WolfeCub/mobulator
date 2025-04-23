@@ -11,3 +11,5 @@ pub const CPL: u8 = 0b00101111;
 pub const SCF: u8 = 0b00110111;
 pub const CCF: u8 = 0b00111111;
 pub const JR_IMM8: u8 = 0b00011000;
+pub const RET: u8 = 0b11001001;
+pub const RETI: u8 = 0b11011001;
