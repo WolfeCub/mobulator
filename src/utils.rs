@@ -79,7 +79,7 @@ impl RegisterU16Ext for u16 {
 
 #[cfg(test)]
 mod test {
-    use crate::utils::{calc_nth_bit_power, RegisterU16Ext};
+    use crate::utils::{RegisterU16Ext, calc_nth_bit_power};
 
     use super::SetBit;
 

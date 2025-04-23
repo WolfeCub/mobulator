@@ -562,7 +562,6 @@ fn add_a_r8() {
             cpu.set_r8(reg, 37);
             cpu.registers.set_c_flg(set_carry);
 
-
             cpu.run_next_instruction()
                 .expect("Unable to process CPU instructions");
 

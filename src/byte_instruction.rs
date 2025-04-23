@@ -71,5 +71,3 @@ mod tests {
         assert_eq!(segs.q(), true);
     }
 }
-
-

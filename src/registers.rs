@@ -1,4 +1,4 @@
-use crate::utils::{is_bit_set_u16, RegisterU16Ext, SetBit};
+use crate::utils::{RegisterU16Ext, SetBit, is_bit_set_u16};
 
 // https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
 #[derive(Debug, Clone, Default)]
@@ -126,7 +126,6 @@ impl Registers {
             }
         }
     }
-
 }
 
 // ┌───────┬────┬────┬────┬────┬────┬────┬──────┬────┐
@@ -239,7 +238,6 @@ impl TryFrom<u8> for Cond {
         }
     }
 }
-
 
 // TODO: Remove repr
 #[repr(u8)]

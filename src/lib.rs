@@ -1,10 +1,10 @@
+pub mod byte_instruction;
 pub mod cpu;
+pub mod instruction;
+pub mod instructions;
+pub mod memory;
 pub mod registers;
 pub mod utils;
-pub mod memory;
-pub mod instructions;
-pub mod byte_instruction;
-pub mod instruction;
 
 #[cfg(test)]
 mod cpu_tests;

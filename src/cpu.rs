@@ -251,7 +251,11 @@ impl Cpu {
 
                 self.registers.set_z_flg(new_val == 0);
                 self.registers.set_n_flg(false);
-                self.registers.set_h_flg(half_carry_add_u8(reg_val, a, carry && self.registers.c_flg()));
+                self.registers.set_h_flg(half_carry_add_u8(
+                    reg_val,
+                    a,
+                    carry && self.registers.c_flg(),
+                ));
                 self.registers.set_c_flg(overflow);
             }
 
@@ -270,7 +274,11 @@ impl Cpu {
 
                 self.registers.set_z_flg(new_val == 0);
                 self.registers.set_n_flg(true);
-                self.registers.set_h_flg(half_carry_sub_u8(a, reg_val, carry && self.registers.c_flg()));
+                self.registers.set_h_flg(half_carry_sub_u8(
+                    a,
+                    reg_val,
+                    carry && self.registers.c_flg(),
+                ));
                 self.registers.set_c_flg(overflow);
             }
 
@@ -321,7 +329,8 @@ impl Cpu {
 
                 self.registers.set_z_flg(reg_val == a);
                 self.registers.set_n_flg(true);
-                self.registers.set_h_flg(half_carry_sub_u8(a, reg_val, false));
+                self.registers
+                    .set_h_flg(half_carry_sub_u8(a, reg_val, false));
                 self.registers.set_c_flg(overflow);
             }
 
