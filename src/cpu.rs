@@ -329,19 +329,21 @@ impl Cpu {
 
             RetCond { cond } => {
                 if self.cond_met(cond) {
-                    self.ret()?;
+                    let val = self.pop()?;
+                    self.registers.pc = val;
                     return Ok(Status::Cycles(5));
                 }
-
             }
 
             Ret => {
-                self.ret()?;
+                let val = self.pop()?;
+                self.registers.pc = val;
             }
 
             Reti => {
                 // TODO: There's some interrupt stuff to do here
-                self.ret()?;
+                let val = self.pop()?;
+                self.registers.pc = val;
             }
 
             JpCondImm16 { cond } => {
@@ -349,8 +351,48 @@ impl Cpu {
 
                 if self.cond_met(cond) {
                     self.registers.pc = imm16;
+                    return Ok(Status::Cycles(4));
                 }
+            }
 
+            JpImm16 => {
+                let imm16 = self.imm16()?;
+                self.registers.pc = imm16;
+            }
+
+            JpHl => {
+                self.registers.pc = self.registers.hl;
+            }
+
+            CallCondImm16 { cond } => {
+                let imm16 = self.imm16()?;
+                if self.cond_met(cond) {
+                    self.push_stack_pc();
+                    self.registers.pc = imm16;
+
+                    return Ok(Status::Cycles(6));
+                }
+            }
+
+            CallImm16 => {
+                let imm16 = self.imm16()?;
+                self.push_stack_pc();
+                self.registers.pc = imm16;
+            }
+
+            RstTgt3 { tgt3 } => {
+                self.push_stack_pc();
+                let addr = u16::from(tgt3) * 8;
+                self.registers.pc = addr;
+            }
+
+            PopR16stk { reg } => {
+                let val = self.pop()?;
+                self.registers.set_r16stk(reg, val);
+            }
+
+            PushR16stk { reg } => {
+                self.push(self.registers.get_r16stk(reg))?;
             }
 
             _ => anyhow::bail!(
@@ -363,6 +405,11 @@ impl Cpu {
         Ok(Status::Cycles(instruction.cycles()))
     }
 
+    fn push_stack_pc(&mut self) {
+        self.registers.sp = self.registers.sp.wrapping_sub(2);
+        self.memory.set_u16(self.registers.sp, self.registers.pc);
+    }
+
     fn cond_met(&mut self, cond: Cond) -> bool {
         match cond {
             Cond::NZ => !self.registers.z_flg(),
@@ -372,11 +419,18 @@ impl Cpu {
         }
     }
 
-    fn ret(&mut self) -> Result<(), anyhow::Error> {
+    fn pop(&mut self) -> Result<u16, anyhow::Error> {
         let low = self.memory.get_byte(self.registers.sp)?;
         let high = self.memory.get_byte(self.registers.sp.wrapping_add(1))?;
         self.registers.sp = self.registers.sp.wrapping_add(2);
-        self.registers.pc = u16::from_be_bytes([high, low]);
+        Ok(u16::from_be_bytes([high, low]))
+    }
+
+    fn push(&mut self, val: u16) -> Result<(), anyhow::Error> {
+        let [high, low] = val.to_be_bytes();
+        self.memory.set_byte(self.registers.sp.wrapping_sub(1), high);
+        self.memory.set_byte(self.registers.sp.wrapping_sub(2), low);
+        self.registers.sp = self.registers.sp.wrapping_sub(2);
         Ok(())
     }
 

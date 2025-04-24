@@ -3,7 +3,7 @@ use mobulator_macros::opcode_match;
 use crate::{
     byte_instruction::ByteInstruction,
     instructions::*,
-    registers::{Cond, R8, R16, R16Mem},
+    registers::{Cond, R16Mem, R16Stk, R16, R8},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -41,6 +41,13 @@ pub enum Instruction {
     Ret,
     Reti,
     JpCondImm16 { cond: Cond },
+    JpImm16,
+    JpHl,
+    CallCondImm16 { cond: Cond },
+    CallImm16,
+    RstTgt3 { tgt3: u8 },
+    PopR16stk { reg: R16Stk },
+    PushR16stk { reg: R16Stk },
 }
 
 impl TryFrom<u8> for Instruction {
@@ -174,6 +181,27 @@ impl TryFrom<u8> for Instruction {
             // jp cond, imm16
             opcode_match!(110__010) => Instruction::JpCondImm16 { cond: instruction.cond().try_into()? },
 
+            // jp imm16
+            JP_IMM16 => Instruction::JpImm16,
+
+            // jp hl
+            JP_HL => Instruction::JpHl,
+
+            // call cond, imm16
+            opcode_match!(110__100) => Instruction::CallCondImm16 { cond: instruction.cond().try_into()? },
+
+            // call imm16
+            CALL_IMM16 => Instruction::CallImm16,
+
+            // rst tgt3
+            opcode_match!(11___111) => Instruction::RstTgt3 { tgt3: instruction.y() },
+
+            // pop r16stk
+            opcode_match!(11__0001) => Instruction::PopR16stk { reg: instruction.p().try_into()? },
+
+            // push r16stk
+            opcode_match!(11__0101) => Instruction::PushR16stk { reg: instruction.p().try_into()? },
+
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
                 value,
@@ -230,6 +258,13 @@ impl Instruction {
             Instruction::Ret => 4,
             Instruction::Reti => 4,
             Instruction::JpCondImm16 { .. } => 3,
+            Instruction::JpImm16 => 4,
+            Instruction::JpHl => 1,
+            Instruction::CallCondImm16 { .. } => 3,
+            Instruction::CallImm16 => 6,
+            Instruction::RstTgt3 { .. } => 4,
+            Instruction::PopR16stk { .. } => 3,
+            Instruction::PushR16stk { .. } => 4,
         }
     }
 }

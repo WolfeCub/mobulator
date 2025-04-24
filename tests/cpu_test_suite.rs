@@ -120,4 +120,40 @@ gen_test!(0xC8, 0xC9);
 gen_test!(0xD8, 0xD9);
 
 // jp cond, imm16
-gen_test!(0xC2);
+// jp imm16
+gen_test!(0xC2, 0xC3);
+gen_test!(0xD2);
+gen_test!(0xCA);
+gen_test!(0xDA);
+
+// jp hl
+gen_test!(0xE9);
+
+// call cond, imm16
+// call imm16
+gen_test!(0xC4);
+gen_test!(0xD4);
+gen_test!(0xCC, 0xCD);
+gen_test!(0xDC);
+
+// rst tgt3
+gen_test!(0xC7);
+gen_test!(0xD7);
+gen_test!(0xE7);
+gen_test!(0xF7);
+gen_test!(0xCF);
+gen_test!(0xDF);
+gen_test!(0xEF);
+gen_test!(0xFF);
+
+// pop r16stk
+gen_test!(0xC1);
+gen_test!(0xD1);
+gen_test!(0xE1);
+gen_test!(0xF1);
+
+// push r16stk
+gen_test!(0xC5);
+gen_test!(0xD5);
+gen_test!(0xE5);
+gen_test!(0xF5);

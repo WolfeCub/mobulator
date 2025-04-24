@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, punctuated::Punctuated, Lit};
-use quote::{format_ident, quote};
+use quote::quote;
+use syn::{Lit, parse_macro_input};
 
 #[proc_macro]
 pub fn opcode_match(tokens: TokenStream) -> TokenStream {
@@ -33,7 +33,10 @@ pub fn opcode_list(tokens: TokenStream) -> TokenStream {
 }
 
 fn generate_instructions(bin_pat: String) -> Vec<u8> {
-    let range = bin_pat.match_indices(|c| c == '_').map(|(i, _)| i).collect::<Vec<_>>();
+    let range = bin_pat
+        .match_indices(|c| c == '_')
+        .map(|(i, _)| i)
+        .collect::<Vec<_>>();
     let min_i = *range.iter().min().expect("Unabled to get min");
     let max_i = *range.iter().max().expect("Unable to get max");
 
@@ -42,13 +45,7 @@ fn generate_instructions(bin_pat: String) -> Vec<u8> {
     let max_value = 2u8.pow(width as u32);
 
     let stripped_binary = bin_pat.replace("_", "0");
+    let starting_val = u8::from_str_radix(&stripped_binary, 2).expect("Unable to parse as binary");
 
-    let mut instructions = Vec::with_capacity(usize::from(max_value));
-    let mut permutation = u8::from_str_radix(&stripped_binary, 2).expect("Unable to parse as binary");
-    for _ in 0..max_value {
-        instructions.push(permutation);
-        permutation += step;
-    }
-
-    instructions
+    (0..max_value).map(|i| starting_val + step * i).collect()
 }

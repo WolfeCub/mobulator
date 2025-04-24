@@ -126,6 +126,27 @@ impl Registers {
             }
         }
     }
+
+    pub fn get_r16stk(&self, r16: R16Stk) -> u16 {
+        match r16 {
+            R16Stk::BC => self.bc,
+            R16Stk::DE => self.de,
+            R16Stk::HL => self.hl,
+            R16Stk::AF => self.af,
+        }
+    }
+
+    pub fn set_r16stk(&mut self, r16: R16Stk, val: u16) {
+        match r16 {
+            R16Stk::BC => self.bc = val,
+            R16Stk::DE => self.de = val,
+            R16Stk::HL => self.hl = val,
+            R16Stk::AF => {
+                self.af = val;
+                self.af &= 0xFFF0;
+            },
+        }
+    }
 }
 
 // ┌───────┬────┬────┬────┬────┬────┬────┬──────┬────┐
@@ -239,13 +260,26 @@ impl TryFrom<u8> for Cond {
     }
 }
 
-// TODO: Remove repr
-#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum R16Stk {
-    BC = 0,
-    DE = 1,
-    HL = 2,
-    AF = 3,
+    BC,
+    DE,
+    HL,
+    AF,
+}
+
+impl TryFrom<u8> for R16Stk {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(R16Stk::BC),
+            1 => Ok(R16Stk::DE),
+            2 => Ok(R16Stk::HL),
+            3 => Ok(R16Stk::AF),
+            _ => anyhow::bail!("Unable to convert u8: '{value}' to Cond"),
+        }
+    }
 }
 
 // TODO: Test more thoroughly

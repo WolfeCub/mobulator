@@ -38,6 +38,12 @@ impl Memory {
         self.memory[usize::from(addr)] = value;
     }
 
+    pub fn set_u16(&mut self, addr: u16, value: u16) {
+        let [high, low] = value.to_be_bytes();
+        self.memory[usize::from(addr)] = low;
+        self.memory[usize::from(addr + 1)] = high;
+    }
+
     pub fn load_instructions(&mut self, instructions: &[u8]) {
         self.memory[..instructions.len()].copy_from_slice(instructions);
     }

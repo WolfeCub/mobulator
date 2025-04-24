@@ -13,3 +13,6 @@ pub const CCF: u8 = 0b00111111;
 pub const JR_IMM8: u8 = 0b00011000;
 pub const RET: u8 = 0b11001001;
 pub const RETI: u8 = 0b11011001;
+pub const JP_IMM16: u8 = 0b11000011;
+pub const JP_HL: u8 = 0b11101001;
+pub const CALL_IMM16: u8 = 0b11001101;
