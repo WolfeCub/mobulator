@@ -5,8 +5,8 @@ use crate::{
     memory::Memory,
     registers::{Cond, R8, Registers},
     utils::{
-        RegisterU16Ext, SetBit, half_carry_add_u8, half_carry_add_u16, half_carry_sub_u8,
-        is_bit_set_u8,
+        RegisterU16Ext, SetBit, carry_u16_i8, half_carry_add_u8, half_carry_add_u16,
+        half_carry_sub_u8, is_bit_set_u8,
     },
 };
 
@@ -327,6 +327,103 @@ impl Cpu {
                 self.registers.set_c_flg(overflow);
             }
 
+            // TODO: All of these should probably be merged with their R8 counterparts
+            AddAImm8 { carry } => {
+                let imm8 = self.imm8()?;
+                let a = self.registers.a();
+
+                let (mut new_val, mut overflow) = a.overflowing_add(imm8);
+                if carry && self.registers.c_flg() {
+                    let (v, o) = new_val.overflowing_add(1);
+                    new_val = v;
+                    overflow |= o;
+                }
+
+                self.registers.set_a(new_val);
+
+                self.registers.set_z_flg(new_val == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(half_carry_add_u8(
+                    a,
+                    imm8,
+                    carry && self.registers.c_flg(),
+                ));
+                self.registers.set_c_flg(overflow);
+            }
+
+            SubAImm8 { carry } => {
+                let imm8 = self.imm8()?;
+                let a = self.registers.a();
+
+                let (mut new_val, mut overflow) = a.overflowing_sub(imm8);
+                if carry && self.registers.c_flg() {
+                    let (v, o) = new_val.overflowing_sub(1);
+                    new_val = v;
+                    overflow |= o;
+                }
+
+                self.registers.set_a(new_val);
+
+                self.registers.set_z_flg(new_val == 0);
+                self.registers.set_n_flg(true);
+                self.registers.set_h_flg(half_carry_sub_u8(
+                    a,
+                    imm8,
+                    carry && self.registers.c_flg(),
+                ));
+                self.registers.set_c_flg(overflow);
+            }
+
+            AndAImm8 => {
+                let imm8 = self.imm8()?;
+                let a = self.registers.a();
+                let new_val = a & imm8;
+                self.registers.set_a(new_val);
+
+                self.registers.set_z_flg(new_val == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(true);
+                self.registers.set_c_flg(false);
+            }
+
+            XorAImm8 => {
+                let imm8 = self.imm8()?;
+                let a = self.registers.a();
+                let new_val = a ^ imm8;
+                self.registers.set_a(new_val);
+
+                self.registers.set_z_flg(new_val == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(false);
+            }
+
+            OrAImm8 => {
+                let imm8 = self.imm8()?;
+                let a = self.registers.a();
+                let new_val = a | imm8;
+                self.registers.set_a(new_val);
+
+                self.registers.set_z_flg(new_val == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(false);
+            }
+
+            CpAImm8 => {
+                let imm8 = self.imm8()?;
+                let a = self.registers.a();
+
+                let (_, overflow) = a.overflowing_sub(imm8);
+
+                self.registers.set_z_flg(imm8 == a);
+                self.registers.set_n_flg(true);
+                self.registers
+                    .set_h_flg(half_carry_sub_u8(a, imm8, false));
+                self.registers.set_c_flg(overflow);
+
+            }
+
             RetCond { cond } => {
                 if self.cond_met(cond) {
                     let val = self.pop()?;
@@ -395,6 +492,77 @@ impl Cpu {
                 self.push(self.registers.get_r16stk(reg))?;
             }
 
+            LdhCA => {
+                let addr = 0xFF00 + u16::from(self.registers.c());
+                self.memory.set_byte(addr, self.registers.a());
+            }
+
+            LdhImm8A => {
+                let addr = 0xFF00 + u16::from(self.imm8()?);
+                self.memory.set_byte(addr, self.registers.a());
+            }
+
+            LdImm16A => {
+                let addr = self.imm16()?;
+                self.memory.set_byte(addr, self.registers.a());
+            }
+
+            LdhAC => {
+                let addr = 0xFF00 + u16::from(self.registers.c());
+                let val = self.memory.get_byte(addr)?;
+                self.registers.set_a(val);
+            }
+
+            LdhAImm8 => {
+                let addr = 0xFF00 + u16::from(self.imm8()?);
+                let val = self.memory.get_byte(addr)?;
+                self.registers.set_a(val);
+            }
+
+            LdAImm16 => {
+                let addr = self.imm16()?;
+                let val = self.memory.get_byte(addr)?;
+                self.registers.set_a(val);
+            }
+
+            AddSpImm8 => {
+                let imm8 = self.imm8_signed()?;
+
+                let new_val = self.registers.sp.wrapping_add_signed(i16::from(imm8));
+
+                self.registers.set_z_flg(false);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(half_carry_add_u8(
+                    self.registers.sp as u8,
+                    imm8 as u8,
+                    false,
+                ));
+                self.registers
+                    .set_c_flg(carry_u16_i8(self.registers.sp, imm8));
+
+                self.registers.sp = new_val;
+            }
+
+            LdHlSpImm8 => {
+                let imm8 = self.imm8_signed()?;
+
+                self.registers.hl = self.registers.sp.wrapping_add_signed(i16::from(imm8));
+
+                self.registers.set_z_flg(false);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(half_carry_add_u8(
+                    self.registers.sp as u8,
+                    imm8 as u8,
+                    false,
+                ));
+                self.registers
+                    .set_c_flg(carry_u16_i8(self.registers.sp, imm8));
+            }
+
+            LdSpHl => {
+                self.registers.sp = self.registers.hl;
+            }
+
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
                 instruction_byte,
@@ -428,7 +596,8 @@ impl Cpu {
 
     fn push(&mut self, val: u16) -> Result<(), anyhow::Error> {
         let [high, low] = val.to_be_bytes();
-        self.memory.set_byte(self.registers.sp.wrapping_sub(1), high);
+        self.memory
+            .set_byte(self.registers.sp.wrapping_sub(1), high);
         self.memory.set_byte(self.registers.sp.wrapping_sub(2), low);
         self.registers.sp = self.registers.sp.wrapping_sub(2);
         Ok(())

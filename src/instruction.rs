@@ -3,7 +3,7 @@ use mobulator_macros::opcode_match;
 use crate::{
     byte_instruction::ByteInstruction,
     instructions::*,
-    registers::{Cond, R16Mem, R16Stk, R16, R8},
+    registers::{Cond, R8, R16, R16Mem, R16Stk},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -37,6 +37,12 @@ pub enum Instruction {
     XorAR8 { reg: R8 },
     OrAR8 { reg: R8 },
     CpAR8 { reg: R8 },
+    AddAImm8 { carry : bool },
+    SubAImm8 { carry : bool },
+    AndAImm8,
+    XorAImm8,
+    OrAImm8,
+    CpAImm8,
     RetCond { cond: Cond },
     Ret,
     Reti,
@@ -48,6 +54,17 @@ pub enum Instruction {
     RstTgt3 { tgt3: u8 },
     PopR16stk { reg: R16Stk },
     PushR16stk { reg: R16Stk },
+    LdhCA,
+    LdhImm8A,
+    LdImm16A,
+    LdhAC,
+    LdhAImm8,
+    LdAImm16,
+    AddSpImm8,
+    LdHlSpImm8,
+    LdSpHl,
+    Di,
+    Ei,
 }
 
 impl TryFrom<u8> for Instruction {
@@ -169,8 +186,30 @@ impl TryFrom<u8> for Instruction {
                 reg: instruction.z().try_into()?,
             },
 
+            // add a, imm8
+            // adc a, imm8
+            opcode_match!(1100_110) => Instruction::AddAImm8 { carry: instruction.q() },
+
+            // sub a, imm8
+            // sbc a, imm8
+            opcode_match!(1101_110) => Instruction::SubAImm8 { carry: instruction.q() },
+
+            // and a, imm8
+            AND_A_IMM8 => Instruction::AndAImm8,
+
+            // xor a, imm8
+            XOR_A_IMM8 => Instruction::XorAImm8,
+
+            // or a, imm8
+            OR_A_IMM8 => Instruction::OrAImm8,
+
+            // cp a, imm8
+            CP_A_IMM8 => Instruction::CpAImm8,
+
             // ret cond
-            opcode_match!(110__000) => Instruction::RetCond { cond: instruction.cond().try_into()? },
+            opcode_match!(110__000) => Instruction::RetCond {
+                cond: instruction.cond().try_into()?,
+            },
 
             // ret
             RET => Instruction::Ret,
@@ -179,7 +218,9 @@ impl TryFrom<u8> for Instruction {
             RETI => Instruction::Reti,
 
             // jp cond, imm16
-            opcode_match!(110__010) => Instruction::JpCondImm16 { cond: instruction.cond().try_into()? },
+            opcode_match!(110__010) => Instruction::JpCondImm16 {
+                cond: instruction.cond().try_into()?,
+            },
 
             // jp imm16
             JP_IMM16 => Instruction::JpImm16,
@@ -188,19 +229,58 @@ impl TryFrom<u8> for Instruction {
             JP_HL => Instruction::JpHl,
 
             // call cond, imm16
-            opcode_match!(110__100) => Instruction::CallCondImm16 { cond: instruction.cond().try_into()? },
+            opcode_match!(110__100) => Instruction::CallCondImm16 {
+                cond: instruction.cond().try_into()?,
+            },
 
             // call imm16
             CALL_IMM16 => Instruction::CallImm16,
 
             // rst tgt3
-            opcode_match!(11___111) => Instruction::RstTgt3 { tgt3: instruction.y() },
+            opcode_match!(11___111) => Instruction::RstTgt3 {
+                tgt3: instruction.y(),
+            },
 
             // pop r16stk
-            opcode_match!(11__0001) => Instruction::PopR16stk { reg: instruction.p().try_into()? },
+            opcode_match!(11__0001) => Instruction::PopR16stk {
+                reg: instruction.p().try_into()?,
+            },
 
             // push r16stk
-            opcode_match!(11__0101) => Instruction::PushR16stk { reg: instruction.p().try_into()? },
+            opcode_match!(11__0101) => Instruction::PushR16stk {
+                reg: instruction.p().try_into()?,
+            },
+
+            // ldh [c], a
+            LDH_C_A => Instruction::LdhCA,
+
+            // ldh [imm8], a
+            LDH_IMM8_A => Instruction::LdhImm8A,
+
+            // ld [imm16], a
+            LD_IMM16_A => Instruction::LdImm16A,
+
+            // ldh a, [c]
+            LDH_A_C => Instruction::LdhAC,
+
+            // ldh a, [imm8]
+            LDH_A_IMM8 => Instruction::LdhAImm8,
+
+            // ld a, [imm16]
+            LD_A_IMM16 => Instruction::LdAImm16,
+
+            // add sp, imm8
+            ADD_SP_IMM8 => Instruction::AddSpImm8,
+
+            // ld hl, sp + imm8
+            LD_HL_SP_IMM8 => Instruction::LdHlSpImm8,
+
+            // ld sp, hl
+            LD_SP_HL => Instruction::LdSpHl,
+
+            DI => Instruction::Di,
+
+            EI => Instruction::Ei,
 
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
@@ -254,6 +334,12 @@ impl Instruction {
             Instruction::OrAR8 { .. } => 1,
             Instruction::CpAR8 { reg: R8::HL } => 2,
             Instruction::CpAR8 { .. } => 1,
+            Instruction::AddAImm8 { .. } => 2,
+            Instruction::SubAImm8 { .. } => 2,
+            Instruction::AndAImm8 => 2,
+            Instruction::XorAImm8 => 2,
+            Instruction::OrAImm8 => 2,
+            Instruction::CpAImm8 => 2,
             Instruction::RetCond { .. } => 2,
             Instruction::Ret => 4,
             Instruction::Reti => 4,
@@ -265,6 +351,17 @@ impl Instruction {
             Instruction::RstTgt3 { .. } => 4,
             Instruction::PopR16stk { .. } => 3,
             Instruction::PushR16stk { .. } => 4,
+            Instruction::LdhCA => 2,
+            Instruction::LdhImm8A => 3,
+            Instruction::LdImm16A => 4,
+            Instruction::LdhAC => 2,
+            Instruction::LdhAImm8 => 3,
+            Instruction::LdAImm16 => 4,
+            Instruction::AddSpImm8 => 4,
+            Instruction::LdHlSpImm8 => 3,
+            Instruction::LdSpHl => 2,
+            Instruction::Di => 1,
+            Instruction::Ei => 1,
         }
     }
 }

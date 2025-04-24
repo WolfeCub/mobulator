@@ -29,6 +29,10 @@ pub(crate) const fn half_carry_add_u16(a: u16, b: u16) -> bool {
     ((a & 0x0FFF) + (b & 0x0FFF)) > 0x0FFF
 }
 
+pub(crate) const fn carry_u16_i8(a: u16, b: i8) -> bool {
+    (a & 0x00FF) + (b as u16 & 0x00FF) > 0x00FF
+}
+
 pub trait SetBit {
     fn set_bit(&mut self, bit: u32, value: bool);
 }
