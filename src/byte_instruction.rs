@@ -1,4 +1,4 @@
-use crate::utils::is_bit_set_u8;
+use crate::utils::BitExt;
 
 /// ┌───┬───┬───┬───┬───┬───┬───┬───┐
 /// │ 7 │ 6 │ 5 │ 4 │ 3 │ 2 │ 1 │ 0 │
@@ -34,7 +34,7 @@ impl ByteInstruction {
     }
 
     pub fn q(&self) -> bool {
-        is_bit_set_u8(self.0, 3)
+        self.0.is_bit_set(3)
     }
 
     pub fn cond(&self) -> u8 {

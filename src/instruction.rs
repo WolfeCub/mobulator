@@ -373,6 +373,13 @@ impl Instruction {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PrefixedInstruction {
     RlcR8 { reg: R8 },
+    RrcR8 { reg: R8 },
+    RlR8 { reg: R8 },
+    RrR8 { reg: R8 },
+    SlaR8 { reg: R8 },
+    SraR8 { reg: R8 },
+    SwapR8 { reg: R8 },
+    SrlR8 { reg: R8 },
 }
 
 impl TryFrom<u8> for PrefixedInstruction {
@@ -382,6 +389,13 @@ impl TryFrom<u8> for PrefixedInstruction {
         let instruction = ByteInstruction(value);
         Ok(match value {
             opcode_match!(00000___) => PrefixedInstruction::RlcR8 { reg: instruction.z().try_into()? },
+            opcode_match!(00001___) => PrefixedInstruction::RrcR8 { reg: instruction.z().try_into()? },
+            opcode_match!(00010___) => PrefixedInstruction::RlR8 { reg: instruction.z().try_into()? },
+            opcode_match!(00011___) => PrefixedInstruction::RrR8 { reg: instruction.z().try_into()? },
+            opcode_match!(00100___) => PrefixedInstruction::SlaR8 { reg: instruction.z().try_into()? },
+            opcode_match!(00101___) => PrefixedInstruction::SraR8 { reg: instruction.z().try_into()? },
+            opcode_match!(00110___) => PrefixedInstruction::SwapR8 { reg: instruction.z().try_into()? },
+            opcode_match!(00111___) => PrefixedInstruction::SrlR8 { reg: instruction.z().try_into()? },
 
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
@@ -397,6 +411,20 @@ impl PrefixedInstruction {
         match self {
             PrefixedInstruction::RlcR8 { reg: R8::HL } => 4,
             PrefixedInstruction::RlcR8 { .. } => 2,
+            PrefixedInstruction::RrcR8 { reg: R8::HL } => 4,
+            PrefixedInstruction::RrcR8 { .. } => 2,
+            PrefixedInstruction::RlR8 { reg: R8::HL } => 4,
+            PrefixedInstruction::RlR8 { .. } => 2,
+            PrefixedInstruction::RrR8 { reg: R8::HL } => 4,
+            PrefixedInstruction::RrR8 { .. } => 2,
+            PrefixedInstruction::SlaR8 { reg: R8::HL } => 4,
+            PrefixedInstruction::SlaR8 { .. } => 2,
+            PrefixedInstruction::SraR8 { reg: R8::HL } => 4,
+            PrefixedInstruction::SraR8 { .. } => 2,
+            PrefixedInstruction::SwapR8 { reg: R8::HL } => 4,
+            PrefixedInstruction::SwapR8 { .. } => 2,
+            PrefixedInstruction::SrlR8 { reg: R8::HL } => 4,
+            PrefixedInstruction::SrlR8 { .. } => 2,
         }
     }
 }

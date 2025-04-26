@@ -5,7 +5,7 @@ use crate::{
     memory::Memory,
     registers::{Cond, Registers, R8},
     utils::{
-        carry_u16_i8, half_carry_add_u16, half_carry_add_u8, half_carry_sub_u8, is_bit_set_u8, RegisterU16Ext, SetBit
+        carry_u16_i8, half_carry_add_u16, half_carry_add_u8, half_carry_sub_u8, RegisterU16Ext, BitExt
     },
 };
 
@@ -120,7 +120,7 @@ impl Cpu {
                 self.registers.set_z_flg(false);
                 self.registers.set_n_flg(false);
                 self.registers.set_h_flg(false);
-                self.registers.set_c_flg(is_bit_set_u8(rotated, 0));
+                self.registers.set_c_flg(rotated.is_bit_set(0));
             }
 
             Rrca => {
@@ -131,7 +131,7 @@ impl Cpu {
                 self.registers.set_z_flg(false);
                 self.registers.set_n_flg(false);
                 self.registers.set_h_flg(false);
-                self.registers.set_c_flg(is_bit_set_u8(a, 0));
+                self.registers.set_c_flg(a.is_bit_set(0));
             }
 
             Rla => {
@@ -144,7 +144,7 @@ impl Cpu {
                 self.registers.set_z_flg(false);
                 self.registers.set_n_flg(false);
                 self.registers.set_h_flg(false);
-                self.registers.set_c_flg(is_bit_set_u8(a, 7));
+                self.registers.set_c_flg(a.is_bit_set(7));
             }
 
             Rra => {
@@ -157,7 +157,7 @@ impl Cpu {
                 self.registers.set_z_flg(false);
                 self.registers.set_n_flg(false);
                 self.registers.set_h_flg(false);
-                self.registers.set_c_flg(is_bit_set_u8(a, 0));
+                self.registers.set_c_flg(a.is_bit_set(0));
             }
 
             Daa => {
@@ -595,7 +595,92 @@ impl Cpu {
                 self.registers.set_z_flg(rotated == 0);
                 self.registers.set_n_flg(false);
                 self.registers.set_h_flg(false);
-                self.registers.set_c_flg(is_bit_set_u8(rotated, 0));
+                self.registers.set_c_flg(rotated.is_bit_set(0));
+            }
+
+            RrcR8 { reg } => {
+                let val = self.get_r8(reg)?;
+                let rotated = val.rotate_right(1);
+                self.set_r8(reg, rotated);
+
+                self.registers.set_z_flg(rotated == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(val.is_bit_set(0));
+            }
+
+            RlR8 { reg } => {
+                let val = self.get_r8(reg)?;
+                let mut rotated = val.rotate_left(1);
+
+                rotated.set_bit(0, self.registers.c_flg());
+                self.set_r8(reg, rotated);
+
+                self.registers.set_z_flg(rotated == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(val.is_bit_set(7));
+            }
+
+            RrR8 { reg } => {
+                let val = self.get_r8(reg)?;
+                let mut rotated = val.rotate_right(1);
+
+                rotated.set_bit(7, self.registers.c_flg());
+                self.set_r8(reg, rotated);
+
+                self.registers.set_z_flg(rotated == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(val.is_bit_set(0));
+            }
+
+            SlaR8 { reg } => {
+                let val = self.get_r8(reg)?;
+                let shifted = val << 1;
+                self.set_r8(reg, shifted);
+
+                self.registers.set_z_flg(shifted == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(val.is_bit_set(7));
+            }
+
+            SraR8 { reg } => {
+                let val = self.get_r8(reg)?;
+                let mut shifted = val >> 1;
+
+                shifted.set_bit(7, val.is_bit_set(7));
+                self.set_r8(reg, shifted);
+
+                self.registers.set_z_flg(shifted == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(val.is_bit_set(0));
+            }
+
+            SwapR8 { reg } => {
+                let val = self.get_r8(reg)?;
+
+                let swapped = ((val & 0b0000_1111) << 4) | (val >> 4);
+                self.set_r8(reg, swapped);
+
+                self.registers.set_z_flg(swapped == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(false);
+            }
+
+            SrlR8 { reg } => {
+                let val = self.get_r8(reg)?;
+                let shifted = val >> 1;
+                self.set_r8(reg, shifted);
+
+                self.registers.set_z_flg(shifted == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(val.is_bit_set(0));
+
             }
 
             // _ => anyhow::bail!(

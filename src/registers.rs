@@ -1,4 +1,4 @@
-use crate::utils::{RegisterU16Ext, SetBit, is_bit_set_u16};
+use crate::utils::{RegisterU16Ext, BitExt, is_bit_set_u16};
 
 // https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
 #[derive(Debug, Clone, Default)]

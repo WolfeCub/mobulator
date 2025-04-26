@@ -7,10 +7,6 @@ pub(crate) const fn calc_nth_bit_power(bit: u32) -> u16 {
     1 << bit
 }
 
-pub(crate) const fn is_bit_set_u8(number: u8, bit: u32) -> bool {
-    is_bit_set_u16(number as u16, bit)
-}
-
 pub(crate) const fn is_bit_set_u16(number: u16, bit: u32) -> bool {
     (number & calc_nth_bit_power(bit)) != 0
 }
@@ -33,12 +29,13 @@ pub(crate) const fn carry_u16_i8(a: u16, b: i8) -> bool {
     (a & 0x00FF) + (b as u16 & 0x00FF) > 0x00FF
 }
 
-pub trait SetBit {
+pub trait BitExt {
     fn set_bit(&mut self, bit: u32, value: bool);
+    fn is_bit_set(&self, bit: u32) -> bool;
 }
 
-// TODO: Don't duplicate these
-impl SetBit for u8 {
+impl BitExt for u8 {
+    // TODO: Don't duplicate these
     fn set_bit(&mut self, bit: u32, value: bool) {
         if value {
             *self |= calc_nth_bit_power(bit) as u8;
@@ -46,15 +43,23 @@ impl SetBit for u8 {
             *self &= !calc_nth_bit_power(bit) as u8;
         }
     }
+
+    fn is_bit_set(&self, bit: u32) -> bool {
+        is_bit_set_u16(*self as u16, bit)
+    }
 }
 
-impl SetBit for u16 {
+impl BitExt for u16 {
     fn set_bit(&mut self, bit: u32, value: bool) {
         if value {
             *self |= calc_nth_bit_power(bit);
         } else {
             *self &= !calc_nth_bit_power(bit);
         }
+    }
+
+    fn is_bit_set(&self, bit: u32) -> bool {
+        is_bit_set_u16(*self, bit)
     }
 }
 
@@ -81,11 +86,12 @@ impl RegisterU16Ext for u16 {
     }
 }
 
+
 #[cfg(test)]
 mod test {
     use crate::utils::{RegisterU16Ext, calc_nth_bit_power};
 
-    use super::SetBit;
+    use super::BitExt;
 
     #[test]
     fn test_calc_nth_bit_power() {
