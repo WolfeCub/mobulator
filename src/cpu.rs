@@ -683,11 +683,26 @@ impl Cpu {
 
             }
 
-            // _ => anyhow::bail!(
-            //     "Haven't implented prefixed instruction: {:08b} (0x{:x})",
-            //     instruction_byte,
-            //     instruction_byte
-            // ),
+            BitB3R8 { bit, reg } => {
+                let val = self.get_r8(reg)?;
+
+                self.registers.set_z_flg(!val.is_bit_set(u32::from(bit)));
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(true);
+            }
+
+            ResB3R8 { bit, reg } => {
+                let mut val = self.get_r8(reg)?;
+                val.set_bit(u32::from(bit), false);
+                self.set_r8(reg, val);
+
+            }
+
+            SetB3R8 { bit, reg } => {
+                let mut val = self.get_r8(reg)?;
+                val.set_bit(u32::from(bit), true);
+                self.set_r8(reg, val);
+            }
         };
 
         Ok(Status::Cycles(instruction.cycles()))
