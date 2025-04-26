@@ -54,6 +54,7 @@ pub enum Instruction {
     RstTgt3 { tgt3: u8 },
     PopR16stk { reg: R16Stk },
     PushR16stk { reg: R16Stk },
+    Prefix,
     LdhCA,
     LdhImm8A,
     LdImm16A,
@@ -251,6 +252,8 @@ impl TryFrom<u8> for Instruction {
                 reg: instruction.p().try_into()?,
             },
 
+            PREFIX => Instruction::Prefix,
+
             // ldh [c], a
             LDH_C_A => Instruction::LdhCA,
 
@@ -351,6 +354,7 @@ impl Instruction {
             Instruction::RstTgt3 { .. } => 4,
             Instruction::PopR16stk { .. } => 3,
             Instruction::PushR16stk { .. } => 4,
+            Instruction::Prefix => 0,
             Instruction::LdhCA => 2,
             Instruction::LdhImm8A => 3,
             Instruction::LdImm16A => 4,
@@ -362,6 +366,37 @@ impl Instruction {
             Instruction::LdSpHl => 2,
             Instruction::Di => 1,
             Instruction::Ei => 1,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum PrefixedInstruction {
+    RlcR8 { reg: R8 },
+}
+
+impl TryFrom<u8> for PrefixedInstruction {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        let instruction = ByteInstruction(value);
+        Ok(match value {
+            opcode_match!(00000___) => PrefixedInstruction::RlcR8 { reg: instruction.z().try_into()? },
+
+            _ => anyhow::bail!(
+                "Haven't implented instruction: {:08b} (0x{:x})",
+                value,
+                value
+            ),
+        })
+    }
+}
+
+impl PrefixedInstruction {
+    pub fn cycles(&self) -> u8 {
+        match self {
+            PrefixedInstruction::RlcR8 { reg: R8::HL } => 4,
+            PrefixedInstruction::RlcR8 { .. } => 2,
         }
     }
 }

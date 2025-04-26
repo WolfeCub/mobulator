@@ -1,12 +1,11 @@
 use anyhow::Context;
 
 use crate::{
-    instruction::Instruction,
+    instruction::{Instruction, PrefixedInstruction},
     memory::Memory,
-    registers::{Cond, R8, Registers},
+    registers::{Cond, Registers, R8},
     utils::{
-        RegisterU16Ext, SetBit, carry_u16_i8, half_carry_add_u8, half_carry_add_u16,
-        half_carry_sub_u8, is_bit_set_u8,
+        carry_u16_i8, half_carry_add_u16, half_carry_add_u8, half_carry_sub_u8, is_bit_set_u8, RegisterU16Ext, SetBit
     },
 };
 
@@ -20,6 +19,7 @@ pub struct Cpu {
 pub enum Status {
     Cycles(u8),
     Break,
+    Prefix,
 }
 
 impl Cpu {
@@ -31,10 +31,16 @@ impl Cpu {
     }
 
     pub fn run_next_instruction(&mut self) -> anyhow::Result<Status> {
-        let Some(instruction_byte) = self.next() else {
-            return Ok(Status::Break);
-        };
+        let result = self.run_8bit_opcode()?;
+        if Status::Prefix == result {
+            return self.run_16bit_opcode();
+        }
 
+        Ok(result)
+    }
+
+    pub fn run_8bit_opcode(&mut self) -> anyhow::Result<Status> {
+        let instruction_byte = self.next().ok_or(anyhow::anyhow!("No more memory"))?;
         let instruction = Instruction::try_from(instruction_byte)?;
 
         use Instruction::*;
@@ -418,10 +424,8 @@ impl Cpu {
 
                 self.registers.set_z_flg(imm8 == a);
                 self.registers.set_n_flg(true);
-                self.registers
-                    .set_h_flg(half_carry_sub_u8(a, imm8, false));
+                self.registers.set_h_flg(half_carry_sub_u8(a, imm8, false));
                 self.registers.set_c_flg(overflow);
-
             }
 
             RetCond { cond } => {
@@ -490,6 +494,10 @@ impl Cpu {
 
             PushR16stk { reg } => {
                 self.push(self.registers.get_r16stk(reg))?;
+            }
+
+            Prefix => {
+                return Ok(Status::Prefix);
             }
 
             LdhCA => {
@@ -568,6 +576,33 @@ impl Cpu {
                 instruction_byte,
                 instruction_byte
             ),
+        };
+
+        Ok(Status::Cycles(instruction.cycles()))
+    }
+
+    pub fn run_16bit_opcode(&mut self) -> anyhow::Result<Status> {
+        let instruction_byte = self.next().ok_or(anyhow::anyhow!("No more memory"))?;
+        let instruction = PrefixedInstruction::try_from(instruction_byte)?;
+
+        use PrefixedInstruction::*;
+
+        match instruction {
+            RlcR8 { reg } => {
+                let rotated = self.get_r8(reg)?.rotate_left(1);
+                self.set_r8(reg, rotated);
+
+                self.registers.set_z_flg(rotated == 0);
+                self.registers.set_n_flg(false);
+                self.registers.set_h_flg(false);
+                self.registers.set_c_flg(is_bit_set_u8(rotated, 0));
+            }
+
+            // _ => anyhow::bail!(
+            //     "Haven't implented prefixed instruction: {:08b} (0x{:x})",
+            //     instruction_byte,
+            //     instruction_byte
+            // ),
         };
 
         Ok(Status::Cycles(instruction.cycles()))

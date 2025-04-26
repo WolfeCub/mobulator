@@ -11,7 +11,6 @@ pub const CPL: u8 = 0b00101111;
 pub const SCF: u8 = 0b00110111;
 pub const CCF: u8 = 0b00111111;
 pub const JR_IMM8: u8 = 0b00011000;
-
 pub const ADD_A_IMM8: u8 = 0b11000110;
 pub const ADC_A_IMM8: u8 = 0b11001110;
 pub const SUB_A_IMM8: u8 = 0b11010110;
@@ -20,12 +19,12 @@ pub const AND_A_IMM8: u8 = 0b11100110;
 pub const XOR_A_IMM8: u8 = 0b11101110;
 pub const OR_A_IMM8: u8 = 0b11110110;
 pub const CP_A_IMM8: u8 = 0b11111110;
-
 pub const RET: u8 = 0b11001001;
 pub const RETI: u8 = 0b11011001;
 pub const JP_IMM16: u8 = 0b11000011;
 pub const JP_HL: u8 = 0b11101001;
 pub const CALL_IMM16: u8 = 0b11001101;
+pub const PREFIX: u8 = 0b11001011;
 pub const LDH_C_A: u8 = 0b11100010;
 pub const LDH_IMM8_A: u8 = 0b11100000;
 pub const LD_IMM16_A: u8 = 0b11101010;
