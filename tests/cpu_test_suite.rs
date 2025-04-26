@@ -99,6 +99,8 @@ fn test_file(tests: Vec<Test>) {
             }
         }
 
+        assert_eq!(cycles, 0);
+
         verify(&test, &cpu);
     }
 }
