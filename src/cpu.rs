@@ -3,9 +3,10 @@ use anyhow::Context;
 use crate::{
     instruction::{Instruction, PrefixedInstruction},
     memory::Memory,
-    registers::{Cond, Registers, R8},
+    registers::{Cond, R8, Registers},
     utils::{
-        carry_u16_i8, half_carry_add_u16, half_carry_add_u8, half_carry_sub_u8, RegisterU16Ext, BitExt
+        BitExt, RegisterU16Ext, carry_u16_i8, half_carry_add_u8, half_carry_add_u16,
+        half_carry_sub_u8,
     },
 };
 
@@ -13,6 +14,7 @@ use crate::{
 pub struct Cpu {
     pub registers: Registers,
     pub memory: Memory,
+    interrupt_master_enable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -442,7 +444,8 @@ impl Cpu {
             }
 
             Reti => {
-                // TODO: There's some interrupt stuff to do here
+                self.interrupt_master_enable = true;
+
                 let val = self.pop()?;
                 self.registers.pc = val;
             }
@@ -571,6 +574,16 @@ impl Cpu {
                 self.registers.sp = self.registers.hl;
             }
 
+            Di => {
+                self.interrupt_master_enable = false;
+            }
+
+            // TODO: The effect of ei is delayed by one instruction. This means that ei followed immediately by di
+            // does not allow any interrupts between them. This interacts with the halt bug in an interesting way.
+            Ei => {
+                self.interrupt_master_enable = true;
+            }
+
             _ => anyhow::bail!(
                 "Haven't implented instruction: {:08b} (0x{:x})",
                 instruction_byte,
@@ -680,7 +693,6 @@ impl Cpu {
                 self.registers.set_n_flg(false);
                 self.registers.set_h_flg(false);
                 self.registers.set_c_flg(val.is_bit_set(0));
-
             }
 
             BitB3R8 { bit, reg } => {
@@ -695,7 +707,6 @@ impl Cpu {
                 let mut val = self.get_r8(reg)?;
                 val.set_bit(u32::from(bit), false);
                 self.set_r8(reg, val);
-
             }
 
             SetB3R8 { bit, reg } => {

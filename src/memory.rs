@@ -1,4 +1,8 @@
+use crate::utils::BitExt;
+
 pub const MEM_SIZE: usize = 0xFFFF + 1;
+pub const INTERRUPT_ENABLE: usize = 0xFFFF;
+pub const INTERRUPT_FLAG: usize = 0xFF0F;
 
 /// 0x0000 - 0x00FF: Boot ROM
 /// 0x0000 - 0x3FFF: Game ROM Bank 0
@@ -46,6 +50,53 @@ impl Memory {
 
     pub fn load_instructions(&mut self, instructions: &[u8]) {
         self.memory[..instructions.len()].copy_from_slice(instructions);
+    }
+
+    pub fn interrupt_enable(&self) -> InterruptByte {
+        InterruptByte(self.memory[INTERRUPT_ENABLE])
+    }
+
+    pub fn interrupt_flag(&self) -> InterruptByte {
+        InterruptByte(self.memory[INTERRUPT_FLAG])
+    }
+}
+
+/// ┌────┬───┬───┬───┬──────┬──────┬─────┬───┬──────┐
+/// │ IE │ 7 │ 6 │ 5 │  4   │  3   │  2  │ 1 │  0   │
+/// ├────┼───┼───┼───┼──────┼──────┼─────┼───┼──────┤
+/// │    │   │   │   │Joypad│Serial│Timer│LCD│VBlank│
+/// └────┴───┴───┴───┴──────┴──────┴─────┴───┴──────┘
+#[derive(Debug, Clone)]
+pub struct InterruptByte(pub u8);
+
+impl InterruptByte {
+    pub fn get_flag(&self, flag: InterruptType) -> bool {
+        self.0.is_bit_set(u32::from(flag.bit()))
+    }
+
+    pub fn set_flag(&mut self, flag: InterruptType, val: bool) {
+        self.0.set_bit(u32::from(flag.bit()), val);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum InterruptType {
+    Joypad,
+    Serial,
+    Timer,
+    LCD,
+    VBlank,
+}
+
+impl InterruptType {
+    pub fn bit(&self) -> u8 {
+        match self {
+            InterruptType::Joypad => 4,
+            InterruptType::Serial => 3,
+            InterruptType::Timer => 2,
+            InterruptType::LCD => 1,
+            InterruptType::VBlank => 0,
+        }
     }
 }
 
