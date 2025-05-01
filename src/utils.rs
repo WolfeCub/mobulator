@@ -29,6 +29,10 @@ pub(crate) const fn carry_u16_i8(a: u16, b: i8) -> bool {
     (a & 0x00FF) + (b as u16 & 0x00FF) > 0x00FF
 }
 
+pub(crate) const fn to_lowest_bit_set(a: u8) -> u8 {
+    a & a.wrapping_neg()
+}
+
 pub trait BitExt {
     fn set_bit(&mut self, bit: u32, value: bool);
     fn is_bit_set(&self, bit: u32) -> bool;
@@ -89,7 +93,7 @@ impl RegisterU16Ext for u16 {
 
 #[cfg(test)]
 mod test {
-    use crate::utils::{RegisterU16Ext, calc_nth_bit_power};
+    use crate::utils::{calc_nth_bit_power, to_lowest_bit_set, RegisterU16Ext};
 
     use super::BitExt;
 
@@ -136,5 +140,14 @@ mod test {
         let mut target: u8 = 0;
         target.set_bit(0, true);
         assert_eq!(target, 0b00000001);
+    }
+
+    #[test]
+    fn test_lowest_bit_set() {
+        assert_eq!(to_lowest_bit_set(0b00000000), 0);
+        assert_eq!(to_lowest_bit_set(0b11111111), 1);
+        assert_eq!(to_lowest_bit_set(0b11111110), 2);
+        assert_eq!(to_lowest_bit_set(0b11111100), 4);
+        assert_eq!(to_lowest_bit_set(0b00001000), 8);
     }
 }

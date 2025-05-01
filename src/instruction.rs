@@ -402,12 +402,6 @@ impl TryFrom<u8> for PrefixedInstruction {
             opcode_match!(01______) => PrefixedInstruction::BitB3R8 { bit: instruction.y(), reg: instruction.z().try_into()? },
             opcode_match!(10______) => PrefixedInstruction::ResB3R8 { bit: instruction.y(), reg: instruction.z().try_into()? },
             opcode_match!(11______) => PrefixedInstruction::SetB3R8 { bit: instruction.y(), reg: instruction.z().try_into()? },
-
-            _ => anyhow::bail!(
-                "Haven't implented instruction: {:08b} (0x{:x})",
-                value,
-                value
-            ),
         })
     }
 }

@@ -1,4 +1,6 @@
-use crate::utils::BitExt;
+use anyhow::Context;
+
+use crate::utils::{BitExt, to_lowest_bit_set};
 
 pub const MEM_SIZE: usize = 0xFFFF + 1;
 pub const INTERRUPT_ENABLE: usize = 0xFFFF;
@@ -52,12 +54,23 @@ impl Memory {
         self.memory[..instructions.len()].copy_from_slice(instructions);
     }
 
-    pub fn interrupt_enable(&self) -> InterruptByte {
-        InterruptByte(self.memory[INTERRUPT_ENABLE])
-    }
+    pub fn interrupt_to_run(&mut self) -> anyhow::Result<Option<InterruptType>> {
+        let ienable = self.memory[INTERRUPT_ENABLE];
+        let iflag = self
+            .memory
+            .get_mut(INTERRUPT_FLAG)
+            .context("IF out of bounds")?;
 
-    pub fn interrupt_flag(&self) -> InterruptByte {
-        InterruptByte(self.memory[INTERRUPT_FLAG])
+        let priority = to_lowest_bit_set(ienable & *iflag);
+
+        if priority == 0 {
+            return Ok(None);
+        }
+
+        let it: InterruptType = priority.try_into()?;
+        iflag.set_bit(u32::from(it.bit()), false);
+
+        Ok(Some(it))
     }
 }
 
@@ -66,10 +79,10 @@ impl Memory {
 /// ├────┼───┼───┼───┼──────┼──────┼─────┼───┼──────┤
 /// │    │   │   │   │Joypad│Serial│Timer│LCD│VBlank│
 /// └────┴───┴───┴───┴──────┴──────┴─────┴───┴──────┘
-#[derive(Debug, Clone)]
-pub struct InterruptByte(pub u8);
+#[derive(Debug)]
+pub struct InterruptByte<'a>(pub &'a mut u8);
 
-impl InterruptByte {
+impl<'a> InterruptByte<'a> {
     pub fn get_flag(&self, flag: InterruptType) -> bool {
         self.0.is_bit_set(u32::from(flag.bit()))
     }
@@ -97,6 +110,35 @@ impl InterruptType {
             InterruptType::LCD => 1,
             InterruptType::VBlank => 0,
         }
+    }
+
+    pub fn addr(&self) -> u16 {
+        match self {
+            InterruptType::Joypad => 0x60,
+            InterruptType::Serial => 0x56,
+            InterruptType::Timer => 0x50,
+            InterruptType::LCD => 0x48,
+            InterruptType::VBlank => 0x40,
+        }
+    }
+}
+
+impl TryFrom<u8> for InterruptType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(match value {
+            16 => InterruptType::Joypad,
+            8 => InterruptType::Serial,
+            4 => InterruptType::Timer,
+            2 => InterruptType::LCD,
+            1 => InterruptType::VBlank,
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Invalid value: '{value}' for InterruptType"
+                ));
+            }
+        })
     }
 }
 

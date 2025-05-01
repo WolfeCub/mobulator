@@ -2,7 +2,7 @@ use anyhow::Context;
 
 use crate::{
     instruction::{Instruction, PrefixedInstruction},
-    memory::Memory,
+    memory::{InterruptType, Memory},
     registers::{Cond, R8, Registers},
     utils::{
         BitExt, RegisterU16Ext, carry_u16_i8, half_carry_add_u8, half_carry_add_u16,
@@ -20,7 +20,6 @@ pub struct Cpu {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Status {
     Cycles(u8),
-    Break,
     Prefix,
 }
 
@@ -34,11 +33,16 @@ impl Cpu {
 
     pub fn run_next_instruction(&mut self) -> anyhow::Result<Status> {
         let result = self.run_8bit_opcode()?;
-        if Status::Prefix == result {
-            return self.run_16bit_opcode();
-        }
+        let mut cycles = 0;
 
-        Ok(result)
+        cycles += match result {
+            Status::Cycles(c) => c,
+            Status::Prefix => self.run_16bit_opcode()?,
+        };
+
+        cycles += self.handle_interrupts()?;
+
+        Ok(Status::Cycles(cycles))
     }
 
     pub fn run_8bit_opcode(&mut self) -> anyhow::Result<Status> {
@@ -594,7 +598,7 @@ impl Cpu {
         Ok(Status::Cycles(instruction.cycles()))
     }
 
-    pub fn run_16bit_opcode(&mut self) -> anyhow::Result<Status> {
+    pub fn run_16bit_opcode(&mut self) -> anyhow::Result<u8> {
         let instruction_byte = self.next().ok_or(anyhow::anyhow!("No more memory"))?;
         let instruction = PrefixedInstruction::try_from(instruction_byte)?;
 
@@ -716,7 +720,36 @@ impl Cpu {
             }
         };
 
-        Ok(Status::Cycles(instruction.cycles()))
+        Ok(instruction.cycles())
+    }
+
+    pub fn handle_interrupts(&mut self) -> anyhow::Result<u8> {
+        if !self.interrupt_master_enable {
+            return Ok(0);
+        }
+
+        let cycles = if let Some(interrupt) = self.memory.interrupt_to_run()? {
+            self.run_interrupt_routine(interrupt)
+        } else {
+            0
+        };
+
+        self.interrupt_master_enable = false;
+        Ok(cycles)
+    }
+
+    pub fn run_interrupt_routine(
+        &mut self,
+        interrupt_type: InterruptType,
+    ) -> u8 {
+        self.push_stack_pc();
+
+        self.registers.pc = interrupt_type.addr();
+
+        // Two wait states are executed (2 M-cycles pass while nothing happens; presumably the CPU is executing nops during this time).
+        // The current value of the PC register is pushed onto the stack, consuming 2 more M-cycles.
+        // The PC register is set to the address of the handler (one of: $40, $48, $50, $58, $60). This consumes one last M-cycle.
+        return 5
     }
 
     fn push_stack_pc(&mut self) {
