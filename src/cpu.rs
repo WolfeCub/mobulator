@@ -33,16 +33,15 @@ impl Cpu {
 
     pub fn run_next_instruction(&mut self) -> anyhow::Result<Status> {
         let result = self.run_8bit_opcode()?;
-        let mut cycles = 0;
 
-        cycles += match result {
+        let op_cycles = match result {
             Status::Cycles(c) => c,
             Status::Prefix => self.run_16bit_opcode()?,
         };
 
-        cycles += self.handle_interrupts()?;
+        let int_cycles = self.handle_interrupts()?;
 
-        Ok(Status::Cycles(cycles))
+        Ok(Status::Cycles(op_cycles + int_cycles))
     }
 
     pub fn run_8bit_opcode(&mut self) -> anyhow::Result<Status> {
